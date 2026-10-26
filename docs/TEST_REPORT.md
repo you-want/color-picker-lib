@@ -4,7 +4,7 @@
 
 **结果：已修复初次审计的 21 类问题，并修复真实浏览器发现的零度红色色相不同步；自动化验收和 Chrome 浏览器验收通过。** 初次审计为 120 个用例、23 个失败断言（对应 19 类问题），另有两项示例集成问题。本轮保留这些断言并扩充回归，最终 **13 个测试文件、174 个用例全部通过，无跳过、无预期失败**。`pnpm verify` 完整执行成功。
 
-这证明了下表范围内的功能与产物可用性。已通过 tt-bridge 连接用户 Chrome 补完浏览器验收；空缓存联网安装仍受环境限制，未计为通过。
+这证明了下表范围内的功能与产物可用性。已通过 tt-bridge 连接用户 Chrome 补完浏览器验收；发布后完成独立空 store 联网安装、类型检查和生产构建。
 
 ## 验收结果
 
@@ -25,6 +25,7 @@
 | root 与 example 锁文件 | 两处 `pnpm install --frozen-lockfile --offline --ignore-scripts --lockfile-only` 均通过，仅验证锁文件一致性 |
 | npm tarball | 22 个文件，31,815 bytes 压缩；包括运行代码、声明、样式、README、LICENSE |
 | tarball 独立宿主消费 | 解包真实 tarball，无库源码别名；示例在临时宿主中类型检查、生产构建和 CSS 检查均通过；依赖复用本机安装 |
+| 发布包全新安装 | npm 0.1.1，独立空 pnpm store 下载 51 个依赖（reused 0）；另行安装消费方工具链后，示例类型检查和生产构建均通过，无库源码别名 |
 | 统一验收 | `pnpm verify` 退出码 0，完整顺序执行测试、库类型、示例类型/构建、tarball 消费 |
 | Chrome 真实浏览器 | tt-bridge 连接 Chrome 155，15/15 组检查通过；真实 snapdom 截图采样、确认回填、取消重试、渐变拖动和键盘事件、Retina 滚动坐标；记录期间无 console error/warn |
 | 变更格式 | `git diff --check` 通过 |
@@ -85,7 +86,7 @@ README 已同步依赖、CSS 导入、组件 API、独立用户上下文、主�
 ## 验收边界
 
 - **Chrome 浏览器验收已完成，范围见下节。** tt-bridge 通过页面 DOM 点击及合成 MouseEvent/KeyboardEvent 操作真实 Chrome；不等同于操作系统可信键鼠输入或屏幕阅读器验收。Firefox/Safari、触屏及缩放矩阵尚未验证。jsdom 回归仍使用 canvas/截图边界替身；Chrome 取色使用真实 snapdom 与 Canvas 像素。
-- **空缓存联网安装未通过环境验证。** 本轮以当前 tarball、Vue 3.5.44、Element Plus 2.14.7 创建独立空缓存安装；npm 调试日志显示 registry.npmjs.org 请求 `ENOTFOUND`，随后表层报 ERESOLVE/element-plus@undefined。未用 force/legacy-peer-deps 绕过；不能将其断言为真实版本冲突。已通过的包消费测试明确复用本机依赖。
+- **空 store 安装已补验通过。** 发布后在独立目录用 pnpm 安装 registry 中的 0.1.1、Vue 3.5.44、Element Plus 2.14.7，51 个依赖全新下载，未复用本机依赖；随后安装独立 Vite / Vue 插件 / TypeScript / vue-tsc / Sass 工具链，类型检查和生产构建通过。早期 npm CLI 的 ENOTFOUND 是执行环境网络限制，不能据此认定 peer 冲突。
 - 示例完整注册 Element Plus，最终 JS 约 1.13 MB，Vite 有 500 kB 分块提示；这是示例总包体积，未当作库自身体积。库体积见上表。
 - 本次未验证移动触摸拖拽、超大页面截图性能、浏览器 hydration、Element Plus 最低版本矩阵。颜色支持范围以 README 为准，不包含 var()/calc()/其他色彩空间等所有 CSS 语法。
 - 初次审计对安装的 30 个生产依赖包名/版本查询 npm bulk advisories，响应为空；本轮未更换这些运行依赖版本。该结果不代表完整安全审计。
@@ -109,4 +110,15 @@ README 已同步依赖、CSS 导入、组件 API、独立用户上下文、主�
 
 本轮统一验收日志：`/private/tmp/color-picker-browser/verification.log`（退出码 0，174/174）；截图位于 `/private/tmp/color-picker-browser/`，含 `palette.png`、`picking.png`、`final.png`。临时浏览器验收脚本仅用于本轮运行，不包含于 npm 产物。
 
-版本整理：0.1.1 增加 CHANGELOG 与发布元数据，示例支持 GitHub Pages 子路径，CI 固定 pnpm 10.32.1 / Node.js 22。`VITE_BASE=/color-picker-lib/ pnpm verify` 再次完整通过；22 文件的实际打包产物通过宿主消费。该子路径的线上验证需另行检查部署结果。
+版本整理：0.1.1 增加 CHANGELOG 与发布元数据，示例支持 GitHub Pages 子路径，CI 固定 pnpm 10.32.1 / Node.js 22。`VITE_BASE=/color-picker-lib/ pnpm verify` 再次完整通过；22 文件的实际打包产物通过宿主消费。该子路径已通过线上检查，见下节。
+
+## 0.1.1 发布与部署凭证
+
+- [npm 0.1.1](https://www.npmjs.com/package/@you-want/color-picker-lib/v/0.1.1) 已发布，registry 的 latest 已为 0.1.1；包内 22 文件。发布包 SHA-1 `9ed403dbad61bf73938810389ede33b55f15036a`，与本地验收包一致。
+- [源码 tag v0.1.1](https://github.com/you-want/color-picker-lib/tree/v0.1.1) 指向 `a2f234465f9cc5d1d97967aade2776ee3680124c`。
+- [GitHub Actions 验收及部署](https://github.com/you-want/color-picker-lib/actions/runs/40329291970) 成功，首次部署源码与 release tag 一致。
+- [线上示例](https://you-want.github.io/color-picker-lib/) 页面及 JS/CSS 正常加载；[version.json](https://you-want.github.io/color-picker-lib/version.json) 返回 0.1.1 与部署 commit。后续 main 的文档提交也会触发工作流，部署 commit 可随之更新。
+- 线上使用真实 snapdom 采样画布背景，确认后回填 `rgba(11, 16, 32, 1)`，浮层移除且未记录到页面错误。
+- npm 发布后的独立消费方使用全新下载的依赖和工具链，示例类型检查、生产构建通过。没有添加 force / legacy-peer-deps，也没有以库源码替代 registry 产物。
+
+发布时仍有非阻塞警告：snapdom 1.9.9 已被上游标记弃用，提示旧版本在文本重排、宽度冻结及 KaTeX 裁剪上存在保真问题；当前截图路径保留宿主样式修复并通过本轮场景，升级到 2.x 需要独立兼容回归，未把复杂页面保真声明为全面通过。Actions 的部分依赖有 Node.js 20 action runtime 弃用提示（GitHub 已改以 Node.js 24 运行），作业仍成功；项目本身使用 Node.js 22。示例全量 Element Plus 的分块提示仍保留。
