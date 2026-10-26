@@ -1,0 +1,83 @@
+.magnifier-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  cursor:
+    url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"%3E%3Cpath d="m15 7 3-3a3 3 0 0 1 4 4l-3 3m-7-6 9 9M16 8 3 21l-2 5 5-2L19 11" fill="white" stroke="%23333" stroke-width="1.5" stroke-linejoin="round"/%3E%3C/svg%3E')
+      1 25,
+    crosshair;
+}
+
+.magnifier-container {
+  position: fixed;
+  width: 180px;
+  height: 180px;
+  box-sizing: border-box;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 24%);
+  pointer-events: none;
+}
+
+.mag-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.color-info-pill {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 5px;
+  border-radius: 3px;
+  background: rgb(32 36 48 / 85%);
+  color: #fff;
+  font:
+    9px/14px Menlo,
+    Consolas,
+    monospace;
+  white-space: nowrap;
+}
+
+.pick-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: rgb(32 36 48 / 90%);
+  color: #fff;
+  font-size: 12px;
+  cursor: default;
+
+  button {
+    padding: 3px 8px;
+    border: 1px solid rgb(255 255 255 / 45%);
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+  }
+}
+
+.pick-hint-sub {
+  font-size: 11px;
+  color: rgb(255 255 255 / 70%);
+  max-width: 480px;
+  text-align: left;
+}

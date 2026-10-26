@@ -1,0 +1,67 @@
+{
+  "name": "@you-want/color-picker-lib",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "取色器(EyeDropper)与调色板(ColorPicker)公共组件库，从设计器主工程抽取并完成解耦，含宿主取色链路与示例应用",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "vite build --config vite.lib.config.ts && vue-tsc -p tsconfig.build.json",
+    "type-check": "vue-tsc --noEmit",
+    "publish:test": "npm publish --registry https://registry.npmjs.org/ --tag test",
+    "publish:latest": "npm publish"
+  },
+  "dependencies": {
+    "@zumer/snapdom": "1.9.9",
+    "mitt": "^3.0.1",
+    "uuid": "^11.1.0",
+    "vue-color": "^3.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.6",
+    "@zumer/snapdom": "^1.9.9",
+    "element-plus": "^2.9.0",
+    "jsdom": "^25.0.1",
+    "pinia": "^2.3.1",
+    "sass": "^1.81.0",
+    "typescript": "~5.7.3",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.5",
+    "vue": "^3.5.13",
+    "vue-color": "^3.3.0",
+    "vue-tsc": "^2.2.12"
+  },
+  "peerDependencies": {
+    "element-plus": ">=2.0.0",
+    "vue": "^3.5.0"
+  },
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "sideEffects": [
+    "**/*.css",
+    "**/*.scss"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "style": "dist/index.css",
+  "keywords": [
+    "vue3",
+    "color-picker",
+    "eyedropper",
+    "snapdom",
+    "gradient",
+    "designer"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/you-want/color-picker-lib.git"
+  }
+}
