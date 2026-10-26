@@ -8,23 +8,35 @@ interface Events {
 }
 
 const rawEmitter: Emitter<Events> = mitt<Events>()
-const handlerMap = new WeakMap<(...args: any[]) => void, (args: any[]) => void>()
+type Handler = (...args: any[]) => void
+const handlerMap = new Map<string | symbol, Map<Handler, (args: any[]) => void>>()
 
 export const eventBus = {
   emit(event: string | symbol, ...args: any[]) {
     rawEmitter.emit(event, args)
   },
   on(event: string | symbol, handler: (...args: any[]) => void) {
+    let handlers = handlerMap.get(event)
+    if (!handlers) {
+      handlers = new Map()
+      handlerMap.set(event, handlers)
+    }
+    if (handlers.has(handler)) return
     const wrapped = (args: any[]) => handler(...(Array.isArray(args) ? args : [args]))
-    handlerMap.set(handler, wrapped)
+    handlers.set(handler, wrapped)
     rawEmitter.on(event, wrapped)
   },
   off(event: string | symbol, handler: (...args: any[]) => void) {
-    const wrapped = handlerMap.get(handler)
-    rawEmitter.off(event, wrapped as (args: any[]) => void)
+    const handlers = handlerMap.get(event)
+    const wrapped = handlers?.get(handler)
+    if (!wrapped) return
+    rawEmitter.off(event, wrapped)
+    handlers!.delete(handler)
+    if (!handlers!.size) handlerMap.delete(event)
   },
   clear() {
-    ;(rawEmitter as any).all.clear()
+    rawEmitter.all.clear()
+    handlerMap.clear()
   },
 }
 

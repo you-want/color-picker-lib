@@ -1,15 +1,21 @@
 {
   "name": "@you-want/color-picker-lib",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "packageManager": "pnpm@10.32.1",
   "type": "module",
   "description": "取色器(EyeDropper)与调色板(ColorPicker)公共组件库，从设计器主工程抽取并完成解耦，含宿主取色链路与示例应用",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "pnpm build && vitest run",
+    "test:audit": "pnpm test",
+    "test:watch": "pnpm build && vitest",
     "build": "vite build --config vite.lib.config.ts && vue-tsc -p tsconfig.build.json",
+    "prepack": "pnpm build",
     "type-check": "vue-tsc --noEmit",
+    "type-check:example": "vue-tsc --noEmit -p example/tsconfig.json",
+    "test:package": "pnpm build && node scripts/verify-package.mjs",
+    "verify": "pnpm test && pnpm type-check && pnpm --dir example build && node scripts/verify-package.mjs",
     "publish:test": "npm publish --registry https://registry.npmjs.org/ --tag test",
     "publish:latest": "npm publish"
   },
@@ -22,26 +28,24 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.4.6",
-    "@zumer/snapdom": "^1.9.9",
     "element-plus": "^2.9.0",
     "jsdom": "^25.0.1",
-    "pinia": "^2.3.1",
     "sass": "^1.81.0",
     "typescript": "~5.7.3",
     "vite": "^6.0.0",
     "vitest": "^3.0.5",
     "vue": "^3.5.13",
-    "vue-color": "^3.3.0",
     "vue-tsc": "^2.2.12"
   },
   "peerDependencies": {
-    "element-plus": ">=2.0.0",
+    "element-plus": ">=2.6.0",
     "vue": "^3.5.0"
   },
   "types": "dist/index.d.ts",
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "package.json"
   ],
   "sideEffects": [
@@ -49,9 +53,15 @@
     "**/*.scss"
   ],
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
-  "style": "dist/index.css",
+  "style": "dist/assets/index.css",
+  "license": "MIT",
+  "homepage": "https://you-want.github.io/color-picker-lib/",
+  "bugs": {
+    "url": "https://github.com/you-want/color-picker-lib/issues"
+  },
   "keywords": [
     "vue3",
     "color-picker",

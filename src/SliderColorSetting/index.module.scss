@@ -74,11 +74,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0px 0px 1px 0px useThemeVar('mask1');
+  box-shadow: 0px 0px 1px 0px var(--color-picker-shadow, #00000033);
   &.slider-select-handle {
     &::before {
-      box-shadow: 0px 0px 2px 1px useThemeVar('color_primary');
-      border: 1px solid useThemeVar('color_primary');
+      box-shadow: 0px 0px 2px 1px var(--color-picker-primary, #316bff);
+      border: 1px solid var(--color-picker-primary, #316bff);
     }
   }
   &::before {

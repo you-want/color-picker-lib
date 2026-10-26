@@ -1,4 +1,5 @@
 import { onBeforeUnmount, ref } from 'vue'
+import { cancelPicking } from '../shared/ColorPickerState'
 
 export interface PickRequest {
   pickerId: string
@@ -14,6 +15,7 @@ export function useColorPickerSession() {
   const pending = ref<PickRequest | null>(null)
 
   function onPickRequest(req: PickRequest) {
+    if (pending.value) cancelPicking(pending.value.pickerId)
     pending.value = req
     // 宿主在此挂载 <EyeDropper :target="canvasEl" @confirm="onPickConfirm" />
   }
@@ -22,6 +24,7 @@ export function useColorPickerSession() {
     const req = pending.value
     pending.value = null
     if (req) {
+      cancelPicking(req.pickerId)
       // 宿主调 pickerRef.applyPickedColor(color)
       return req.pickerId
     }
@@ -29,12 +32,11 @@ export function useColorPickerSession() {
   }
 
   function onPickClose() {
+    if (pending.value) cancelPicking(pending.value.pickerId)
     pending.value = null
   }
 
-  onBeforeUnmount(() => {
-    pending.value = null
-  })
+  onBeforeUnmount(onPickClose)
 
   return { pending, onPickRequest, onPickConfirm, onPickClose }
 }

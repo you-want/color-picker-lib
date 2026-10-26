@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CaptureCanvasOptions } from '../EyeDropper/captureCanvas'
+import type { ColorStop as SliderButton } from '../shared/types'
 import { useRecentColors } from '../composables/useRecentColors'
 import {
   cancelPicking,
@@ -7,7 +8,7 @@ import {
   setActivePickerId,
 } from '../shared/ColorPickerState'
 import { eventBus } from '../shared/EventBus'
-import { DEFAULT_COLORS, EXCLUDE_SELECTOR } from '../shared/defaults'
+import { DEFAULT_COLORS } from '../shared/defaults'
 import {
   extractColorHexStringsPureJS,
   gradientAngleToDegrees,
@@ -89,19 +90,12 @@ const emit = defineEmits<{
   (e: 'colorType', value: number): void
   (e: 'change', selectColor: string): void
 }>()
-interface SliderButton {
-  position: number
-  type?: string
-  isActive: boolean
-  id: string
-  color: string
-}
 // 部分调用方在模板中传 uuid()，重渲染时仍需保持本次组件实例的取色身份。
 const pickerId = props.id
 const modelValue = defineModel<string>()
 
 // 最近颜色改为无 pinia 的组合式函数，userId 由宿主 getUserId 注入。
-const recent = useRecentColors({ getUserId: props.getUserId, storageKey: props.storageKey })
+const recent = useRecentColors({ getUserId: () => props.getUserId?.() || '', storageKey: props.storageKey })
 
 const selectColor = ref(props.defaultColor)
 const pickerKey = ref(0)
@@ -117,6 +111,7 @@ const isReverseColor = ref(false)
 const sessionUserId = ref('')
 let sessionChanged = false
 let sessionColor = ''
+let lastEmittedColor: string | null = null
 
 // 当前色固定占第一格，历史从第二格开始；允许当前色和刚提交的历史色相同。
 const useColors = computed(() =>
@@ -128,20 +123,51 @@ const useColors = computed(() =>
 const sketchPickerValue = computed(() =>
   toSketchPickerColorValue(selectColor.value, colorType.value === 1 ? 100 : props.fillOpacity),
 )
+watch(sketchPickerValue, async (value) => {
+  // vue-color 3.3.x 将所有 0° 色相都当作无色相，红色也会错误保留前一个色相。
+  // 仅在实际红色与面板不一致时重建；灰色和正在拖动的正确色相保持不变。
+  let color
+  try { color = parseColorToRGBA(value) } catch { return }
+  const { r, g, b } = color
+  if (!(r > g && g === b)) return
+  const root = getSketchPickerRoot()
+  const hue = root?.querySelector('[aria-label="Hue"]')?.getAttribute('aria-valuenow')
+  if (hue == null || Number(hue) === 0 || Number(hue) === 360) return
+  const active = document.activeElement
+  const input = active instanceof HTMLInputElement && root?.contains(active) ? active : null
+  const label = input?.getAttribute('aria-label')
+  const selection = input ? [input.selectionStart, input.selectionEnd] : null
+  pickerKey.value++
+  await nextTick()
+  expressColor()
+  if (label) {
+    // 浮层 focus-trap 会在旧输入卸载后异步回焦，等它结束再恢复编辑位置。
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const replacement = [...(getSketchPickerRoot()?.querySelectorAll('input') || [])]
+      .find(element => element.getAttribute('aria-label') === label)
+    replacement?.focus({ preventScroll: true })
+    if (replacement && selection) replacement.setSelectionRange(selection[0], selection[1])
+  }
+}, { flush: 'post' })
 function solidBase(raw?: string) {
   return raw?.includes('linear-gradient')
     ? parseGradient(raw)?.colorStops[0]?.color || props.defaultColor
     : raw || props.defaultColor
 }
 function halfHex() {
-  const c = parseColorToRGBA(rgba(solidBase(modelValue.value), props.fillOpacity / 100))
+  let c
+  try {
+    c = parseColorToRGBA(toSketchPickerColorValue(solidBase(modelValue.value), props.fillOpacity))
+  } catch {
+    c = parseColorToRGBA('#316BFF')
+  }
   return extractColorHexStringsPureJS(rgbToHex(c.r, c.g, c.b, true, c.a))
 }
 const leftColor = computed(() => halfHex()?.opaqueHex)
 const rightColor = computed(() => halfHex()?.alphaHex)
 
-function syncFromModel() {
-  const parsed = modelValue.value?.includes('linear-gradient') ? parseGradient(modelValue.value) : null
+function syncFromModel(value = modelValue.value) {
+  const parsed = value ? parseGradient(value) : null
   colorType.value = parsed ? 1 : 0
   if (parsed) {
     degValue.value = gradientAngleToDegrees(parsed.angle)
@@ -159,18 +185,24 @@ function syncFromModel() {
     simpleGradientActiveStop.value = Math.min(activeIndex, 1)
     selectColor.value = sliderButtonsValue.value.find(item => item.isActive)?.color || props.defaultColor
   } else {
-    selectColor.value = modelValue.value || props.defaultColor
+    selectColor.value = value || props.defaultColor
   }
   emit('colorType', colorType.value)
 }
 watch(
   modelValue,
-  () => {
-    // 本地编辑时色标是唯一数据源，不能因为父组件回写而重置当前激活色标。
-    if (!popoverShow.value) {
-      syncFromModel()
-    } else if (colorType.value === 0 && !modelValue.value?.includes('linear-gradient')) {
-      selectColor.value = modelValue.value || props.defaultColor
+  (value) => {
+    // 本地回写保留激活色标，外部更新（包括撤销）始终同步。
+    if (popoverShow.value && value === lastEmittedColor) {
+      lastEmittedColor = null
+      return
+    }
+    lastEmittedColor = null
+    syncFromModel(value)
+    if (popoverShow.value) {
+      sessionChanged = false
+      sessionColor = value || props.defaultColor
+      if (colorType.value === 1) emit('changeColorSet', sliderButtonsValue.value)
     }
   },
   { immediate: true },
@@ -208,9 +240,8 @@ watch(
   popoverShow,
   async (visible) => {
     if (visible) {
-      const uid = props.getUserId ? props.getUserId() : ''
-      recent.setUserId(uid || recent.userId.value)
-      sessionUserId.value = uid || recent.userId.value
+      recent.refreshUserId()
+      sessionUserId.value = recent.userId.value
       sessionChanged = false
       sessionColor = modelValue.value || props.defaultColor
       syncFromModel()
@@ -229,8 +260,8 @@ watch(
   { flush: 'post' },
 )
 function finishSession() {
-  if (sessionChanged && sessionUserId.value) {
-    recent.changeUseColor(sessionColor, sessionUserId.value)
+  if (sessionChanged) {
+    if (sessionUserId.value) recent.changeUseColor(sessionColor, sessionUserId.value)
     emit('sessionCommit', sessionColor)
   }
   sessionChanged = false
@@ -240,8 +271,9 @@ function applyColor(value: string) {
   if (!value) {
     return
   }
-  sessionChanged ||= value !== modelValue.value
+  sessionChanged ||= popoverShow.value && value !== modelValue.value
   sessionColor = value
+  lastEmittedColor = value
   modelValue.value = value
   emit('change', value)
 }
@@ -251,6 +283,15 @@ function buildGradient() {
 }
 function gradientUpdate(value: string) {
   if (popoverShow.value && colorType.value === 1 && value) {
+    const current = parseGradient(lastEmittedColor ?? modelValue.value ?? '')
+    const next = parseGradient(value)
+    // 子滑块收到父级色标/角度时也会发出预览值；同一渐变的格式化不算用户编辑。
+    if (current && next
+      && gradientAngleToDegrees(current.angle) === gradientAngleToDegrees(next.angle)
+      && current.colorStops.length === next.colorStops.length
+      && current.colorStops.every((stop, i) => stop.color === next.colorStops[i].color && stop.offset === next.colorStops[i].offset)) {
+      return
+    }
     applyColor(value)
   }
 }
@@ -273,12 +314,12 @@ function updateValue(colors: Parameters<typeof sketchPickerInputToColorString>[0
   }
 }
 function chooseRecentColor(value: string) {
-  if (value.includes('linear-gradient')) {
+  if (parseGradient(value)) {
     if (!props.isNeedGradient) {
       return
     }
     applyColor(value)
-    syncFromModel()
+    syncFromModel(value)
     emit('changeColorSet', sliderButtonsValue.value)
     nextTick(() => eventBus.emit('changeSliderButtons', sliderButtonsValue.value))
   } else {
@@ -381,7 +422,8 @@ function applyPickedColor(color: string) {
   cancelPicking(pickerId)
 }
 function colorBlankClickHandler(visible: boolean) {
-  if (!pickerState.pickingPickerId) {
+  if (!pickerState.pickingPickerId && !props.disabled && !props.settingDisabled
+    && (!visible || pickerState.activePickerId === pickerId)) {
     popoverShow.value = visible
   }
 }
@@ -398,6 +440,13 @@ function handleOutsidePointer(event: PointerEvent) {
     return
   }
   popoverShow.value = false
+}
+function handleEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape' && popoverShow.value && !pickerState.pickingPickerId) {
+    popoverShow.value = false
+    event.preventDefault()
+    pickerContainerRef.value?.querySelector<HTMLElement>('.color-picker-reference button')?.focus()
+  }
 }
 watch(
   () => props.disabled || props.settingDisabled,
@@ -432,10 +481,10 @@ function isValidSketchChannelValue(value: string, isAlpha: boolean): boolean {
     return false
   }
   if (isAlpha) {
-    const n = Number.parseFloat(value)
-    return !Number.isNaN(n) && n >= 0 && n <= 1
+    const n = Number(value)
+    return value.trim() !== '' && Number.isFinite(n) && n >= 0 && n <= 1
   }
-  return /^(?:0|[1-9]\d{0,2})$/.test(value)
+  return /^(?:0|[1-9]\d{0,2})$/.test(value) && Number(value) <= 255
 }
 
 function getSketchPickerRoot(): HTMLElement | null {
@@ -544,6 +593,7 @@ function expressColor() {
 onMounted(() => {
   recent.refreshUserId()
   document.addEventListener('pointerdown', handleOutsidePointer, true)
+  document.addEventListener('keydown', handleEscape, true)
   eventBus.on('closeColorPopver', colorBlankClickHandler)
   eventBus.on('setSliderAngle', setSliderAngleHandler)
   eventBus.on('finallColor', getFinallColor)
@@ -552,6 +602,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   finishSession()
   document.removeEventListener('pointerdown', handleOutsidePointer, true)
+  document.removeEventListener('keydown', handleEscape, true)
   detachExpressColorListeners()
   if (pickerState.activePickerId === pickerId) {
     setActivePickerId(null)
@@ -773,70 +824,92 @@ defineExpose({ applyPickedColor })
         </div>
       </template>
       <template #reference>
-        <slot name="trigger">
-          <div
-            v-if="triggerMixed"
-            class="picker-trigger picker-trigger-mixed"
-            :style="{
-              cursor: disabled || settingDisabled ? 'not-allowed' : 'pointer',
-            }"
-            @click.stop="togglePopover"
-          >
-            <span class="trigger-color trigger-color-mixed" />
-          </div>
-          <div
-            v-else-if="useSingleColorBlock && colorType !== 1"
-            class="picker-trigger"
-            :style="{
-              cursor: disabled || settingDisabled ? 'not-allowed' : 'pointer',
-            }"
-            @click.stop="togglePopover"
-          >
-            <span
-              class="trigger-color"
+        <div class="color-picker-reference" @click="togglePopover">
+          <slot name="trigger">
+            <button
+              v-if="triggerMixed"
+              type="button"
+              aria-label="选择颜色"
+              aria-haspopup="dialog"
+              :aria-expanded="popoverShow"
+              :disabled="disabled || settingDisabled"
+              class="picker-trigger picker-trigger-mixed"
               :style="{
-                background:
-                  modelValue && !String(modelValue).includes('linear-gradient')
-                    ? modelValue
-                    : defaultColor || '#1A76F5',
-                opacity: disabled ? 0 : fillOpacity / 100,
+                cursor: disabled || settingDisabled ? 'not-allowed' : 'pointer',
               }"
-            />
-          </div>
-          <div
-            v-else-if="colorType === 1"
-            class="picker-trigger"
-            :style="{
-              cursor: disabled || settingDisabled ? 'not-allowed' : 'pointer',
-            }"
-            @click.stop="togglePopover"
-          >
-            <span
-              class="trigger-color"
+              @click.stop="togglePopover"
+            >
+              <span class="trigger-color trigger-color-mixed" />
+            </button>
+            <button
+              v-else-if="useSingleColorBlock && colorType !== 1"
+              type="button"
+              aria-label="选择颜色"
+              aria-haspopup="dialog"
+              :aria-expanded="popoverShow"
+              :disabled="disabled || settingDisabled"
+              class="picker-trigger"
               :style="{
-                background: modelValue,
-                opacity: disabled ? 0 : fillOpacity / 100,
+                cursor: disabled || settingDisabled ? 'not-allowed' : 'pointer',
               }"
-            />
-          </div>
-          <div
-            v-else
-            class="half-picker-trigger"
-            :style="{
-              cursor: disabled || settingDisabled ? 'not-allowed' : 'pointer',
-            }"
-            @click.stop="togglePopover"
-          >
-            <span
-              class="half-trigger-color left"
-              :style="{ backgroundColor: leftColor }"
-            />
-            <span
-              class="half-trigger-color right"
-              :style="{ backgroundColor: rightColor }"
-            />
-          </div>
-        </slot>
+              @click.stop="togglePopover"
+            >
+              <span
+                class="trigger-color"
+                :style="{
+                  background:
+                    modelValue && !String(modelValue).includes('linear-gradient')
+                      ? modelValue
+                      : defaultColor || '#1A76F5',
+                  opacity: disabled ? 0 : fillOpacity / 100,
+                }"
+              />
+            </button>
+            <button
+              v-else-if="colorType === 1"
+              type="button"
+              aria-label="选择颜色"
+              aria-haspopup="dialog"
+              :aria-expanded="popoverShow"
+              :disabled="disabled || settingDisabled"
+              class="picker-trigger"
+              :style="{
+                cursor: disabled || settingDisabled ? 'not-allowed' : 'pointer',
+              }"
+              @click.stop="togglePopover"
+            >
+              <span
+                class="trigger-color"
+                :style="{
+                  background: modelValue,
+                  opacity: disabled ? 0 : fillOpacity / 100,
+                }"
+              />
+            </button>
+            <button
+              v-else
+              type="button"
+              aria-label="选择颜色"
+              aria-haspopup="dialog"
+              :aria-expanded="popoverShow"
+              :disabled="disabled || settingDisabled"
+              class="half-picker-trigger"
+              :style="{
+                cursor: disabled || settingDisabled ? 'not-allowed' : 'pointer',
+              }"
+              @click.stop="togglePopover"
+            >
+              <span
+                class="half-trigger-color left"
+                :style="{ backgroundColor: leftColor }"
+              />
+              <span
+                class="half-trigger-color right"
+                :style="{ backgroundColor: rightColor }"
+              />
+            </button>
+          </slot>
+        </div>
       </template>
     </el-popover>
   </div>

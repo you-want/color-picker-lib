@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ColorPicker, EyeDropper, useColorPickerSession } from '@you-want/color-picker-lib'
+import { ColorPicker, EyeDropper, useColorPickerSession, type ColorStop } from '@you-want/color-picker-lib'
 
 // 宿主侧登录态：演示用固定 userId
 function getUserId(): string {
@@ -8,7 +8,7 @@ function getUserId(): string {
 }
 
 const color = ref('#316BFF')
-const stops = ref<{ position: number, color: string, isActive: boolean }[]>([])
+const stops = ref<ColorStop[]>([])
 const canvasEl = ref<HTMLElement | null>(null)
 
 // 宿主取色会话：pick-request → 挂 EyeDropper → confirm 回填
@@ -21,7 +21,7 @@ function onPickConfirm(hex: string) {
   const pickerId = session.onPickConfirm(hex)
   if (pickerId) {
     // 库内只有一个示例 picker，直接回填
-    ;(pickerRef.value as any)?.applyPickedColor(hex)
+    pickerRef.value?.applyPickedColor(hex)
   }
 }
 const pickerRef = ref<InstanceType<typeof ColorPicker> | null>(null)

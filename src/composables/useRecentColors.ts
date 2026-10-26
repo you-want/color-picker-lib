@@ -11,7 +11,7 @@ const HISTORY_LIMIT = 15
 function solidColorKey(value: string): string {
   const color = value.trim()
   // 只归一化可完整解析的格式，未知格式保留原文，避免错误合并为默认色。
-  if (/^(?:#?(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})|rgba?\([^()]*\)|hsla?\([^()]*\)|transparent)$/i.test(color)) {
+  if (color) {
     try {
       const { r, g, b, a } = parseColorToRGBA(color)
       if ([r, g, b, a].every(Number.isFinite)) {
@@ -31,7 +31,7 @@ function colorKey(value: string): string {
   }
   const angle = gradient.angle.trim().toLowerCase().replace(/\s+/g, ' ')
   // CSS 的对角方向随容器宽高比变化，不能当成固定 45° 合并。
-  const direction = angle.endsWith('deg') || /^to (?:top|right|bottom|left)$/.test(angle)
+  const direction = /(?:deg|grad|rad|turn)$/.test(angle) || /^to (?:top|right|bottom|left)$/.test(angle)
     ? ((gradientAngleToDegrees(angle) % 360) + 360) % 360
     : angle
   return JSON.stringify([
@@ -100,29 +100,33 @@ export interface UseRecentColorsOptions {
 /**
  * 组合式最近使用颜色，无 pinia 依赖。语义化去重（颜色值+方向+色标位置）
  * 与旧 key 迁移逻辑与原 RecenterlyUseColor store 保持一致。
- * 模块级单例：同宿主多个 picker 共享同一份内存历史，localStorage 负责持久化。
+ * 相同 storageKey 共享历史；每个调用实例有独立的用户上下文。
  */
-const sharedState = reactive<UserColors[]>([])
-let sharedUserId = ref('')
-let initialized = false
-let initStorageKey = 'recenterlyUseColor:v2'
-let initLegacyKey = 'recenterlyUseColor'
+interface HistoryState {
+  colors: UserColors[]
+  initialized: boolean
+}
+const histories = new Map<string, HistoryState>()
 
-function ensureInit(storageKey: string, legacyKey: string) {
-  if (!initialized) {
-    sharedState.splice(0, sharedState.length, ...readColors(storageKey, legacyKey))
-    initStorageKey = storageKey
-    initLegacyKey = legacyKey
-    initialized = true
+function ensureInit(storageKey: string, legacyKey: string): HistoryState {
+  // SSR 不在不同请求间共享历史；浏览器内按存储键共享。
+  let state = typeof window === 'undefined' ? undefined : histories.get(storageKey)
+  if (!state) {
+    state = { colors: reactive<UserColors[]>([]), initialized: false }
+    if (typeof window !== 'undefined') histories.set(storageKey, state)
   }
+  if (!state.initialized) {
+    state.colors.splice(0, state.colors.length, ...readColors(storageKey, legacyKey))
+    state.initialized = true
+  }
+  return state
 }
 
 export function useRecentColors(options: UseRecentColorsOptions = {}): RecentColorsApi {
   const storageKey = options.storageKey ?? 'recenterlyUseColor:v2'
   const legacyKey = options.legacyKey ?? 'recenterlyUseColor'
-  ensureInit(storageKey, legacyKey)
-
-  const userId = sharedUserId
+  const sharedState = ensureInit(storageKey, legacyKey).colors
+  const userId = ref('')
 
   const userColors = computed(() =>
     sharedState.find(item => item.userId === userId.value)?.colors || [],
@@ -130,7 +134,7 @@ export function useRecentColors(options: UseRecentColorsOptions = {}): RecentCol
 
   function persist() {
     try {
-      localStorage.setItem(initStorageKey, JSON.stringify(sharedState))
+      localStorage.setItem(storageKey, JSON.stringify(sharedState))
     } catch {
       // 隐私模式或存储额度已满时仍可在本次会话中使用。
     }
@@ -155,7 +159,7 @@ export function useRecentColors(options: UseRecentColorsOptions = {}): RecentCol
   }
 
   function setUserId(value: string) {
-    sharedUserId.value = value
+    userId.value = value
     addRecenterlyUserColor(value)
   }
 
@@ -180,7 +184,8 @@ export function useRecentColors(options: UseRecentColorsOptions = {}): RecentCol
 
 /** 测试或宿主重置历史（仅清空内存，不动 localStorage）。 */
 export function resetRecentColors() {
-  sharedState.splice(0, sharedState.length)
-  sharedUserId.value = ''
-  initialized = false
+  for (const state of histories.values()) {
+    state.colors.splice(0, state.colors.length)
+    state.initialized = false
+  }
 }

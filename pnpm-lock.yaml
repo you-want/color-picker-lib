@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@zumer/snapdom':
-        specifier: ^1.9.9
+        specifier: 1.9.9
         version: 1.9.9
       mitt:
         specifier: ^3.0.1
@@ -33,9 +33,6 @@ importers:
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
-      pinia:
-        specifier: ^2.3.1
-        version: 2.3.1(typescript@5.7.3)(vue@3.5.44(typescript@5.7.3))
       sass:
         specifier: ^1.81.0
         version: 1.106.1

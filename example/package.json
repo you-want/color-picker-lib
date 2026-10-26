@@ -1,21 +1,21 @@
 {
   "name": "@you-want/color-picker-example",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "pnpm --dir .. build && pnpm --dir .. type-check:example && vite build"
   },
   "dependencies": {
     "element-plus": "^2.9.0",
     "vue": "^3.5.13",
-    "@you-want/color-picker-lib": "^0.1.0"
+    "@you-want/color-picker-lib": "link:.."
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
     "sass": "^1.81.0",
-    "typescript": "^7.0.2",
+    "typescript": "~5.7.3",
     "vite": "^6.0.0"
   }
 }

@@ -9,24 +9,24 @@ importers:
   .:
     dependencies:
       '@you-want/color-picker-lib':
-        specifier: ^0.1.0
-        version: 0.1.0(element-plus@2.14.7(vue@3.5.44(typescript@7.0.2)))(vue@3.5.44(typescript@7.0.2))
+        specifier: link:..
+        version: link:..
       element-plus:
         specifier: ^2.9.0
-        version: 2.14.7(vue@3.5.44(typescript@7.0.2))
+        version: 2.14.7(vue@3.5.44(typescript@5.7.3))
       vue:
         specifier: ^3.5.13
-        version: 3.5.44(typescript@7.0.2)
+        version: 3.5.44(typescript@5.7.3)
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: ^5.2.1
-        version: 5.2.4(vite@6.4.5(sass@1.106.1))(vue@3.5.44(typescript@7.0.2))
+        version: 5.2.4(vite@6.4.5(sass@1.106.1))(vue@3.5.44(typescript@5.7.3))
       sass:
         specifier: ^1.81.0
         version: 1.106.1
       typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
+        specifier: ~5.7.3
+        version: 5.7.3
       vite:
         specifier: ^6.0.0
         version: 6.4.5(sass@1.106.1)
@@ -619,12 +619,6 @@ packages:
     peerDependencies:
       vue: ^3.5.0
 
-  '@you-want/color-picker-lib@0.1.0':
-    resolution: {integrity: sha512-4Pd5nRRpeCmD7EdQ5IThGmtwcgRYcXRJyzBT2dKdGMjAqXLdCs2nrGv9CD5LT0lzEGIxKilXnaYqoYT6Axdnsw==}
-    peerDependencies:
-      element-plus: '>=2.0.0'
-      vue: ^3.5.0
-
   '@zumer/snapdom@1.9.9':
     resolution: {integrity: sha512-tBqAdoq1lTJp5cozENtW9H5ZxEpJfagka99dOd7O5j+VbTDWANvPiJsgPLlJMFXUUfyxeL17JFYB2RzM2XxqPg==}
     deprecated: Old versions have known fidelity bugs (text re-wrap, width freezing, KaTeX clipping). Upgrade to ^2.22 — drop-in for any 2.x. https://github.com/zumerlab/snapdom/releases
@@ -760,9 +754,9 @@ packages:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
     engines: {node: '>=12.0.0'}
 
-  typescript@7.0.2:
-    resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
-    engines: {node: '>=16.20.0'}
+  typescript@5.7.3:
+    resolution: {integrity: sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw==}
+    engines: {node: '>=14.17'}
     hasBin: true
 
   uuid@11.1.1:
@@ -842,9 +836,9 @@ snapshots:
 
   '@ctrl/tinycolor@4.2.1': {}
 
-  '@element-plus/icons-vue@2.3.2(vue@3.5.44(typescript@7.0.2))':
+  '@element-plus/icons-vue@2.3.2(vue@3.5.44(typescript@5.7.3))':
     dependencies:
-      vue: 3.5.44(typescript@7.0.2)
+      vue: 3.5.44(typescript@5.7.3)
 
   '@esbuild/aix-ppc64@0.25.12':
     optional: true
@@ -1144,10 +1138,10 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  '@vitejs/plugin-vue@5.2.4(vite@6.4.5(sass@1.106.1))(vue@3.5.44(typescript@7.0.2))':
+  '@vitejs/plugin-vue@5.2.4(vite@6.4.5(sass@1.106.1))(vue@3.5.44(typescript@5.7.3))':
     dependencies:
       vite: 6.4.5(sass@1.106.1)
-      vue: 3.5.44(typescript@7.0.2)
+      vue: 3.5.44(typescript@5.7.3)
 
   '@vue/compiler-core@3.5.44':
     dependencies:
@@ -1203,27 +1197,18 @@ snapshots:
 
   '@vue/shared@3.5.44': {}
 
-  '@vueuse/core@15.0.0(vue@3.5.44(typescript@7.0.2))':
+  '@vueuse/core@15.0.0(vue@3.5.44(typescript@5.7.3))':
     dependencies:
       '@types/web-bluetooth': 0.0.21
       '@vueuse/metadata': 15.0.0
-      '@vueuse/shared': 15.0.0(vue@3.5.44(typescript@7.0.2))
-      vue: 3.5.44(typescript@7.0.2)
+      '@vueuse/shared': 15.0.0(vue@3.5.44(typescript@5.7.3))
+      vue: 3.5.44(typescript@5.7.3)
 
   '@vueuse/metadata@15.0.0': {}
 
-  '@vueuse/shared@15.0.0(vue@3.5.44(typescript@7.0.2))':
+  '@vueuse/shared@15.0.0(vue@3.5.44(typescript@5.7.3))':
     dependencies:
-      vue: 3.5.44(typescript@7.0.2)
-
-  '@you-want/color-picker-lib@0.1.0(element-plus@2.14.7(vue@3.5.44(typescript@7.0.2)))(vue@3.5.44(typescript@7.0.2))':
-    dependencies:
-      '@zumer/snapdom': 1.9.9
-      element-plus: 2.14.7(vue@3.5.44(typescript@7.0.2))
-      mitt: 3.0.1
-      uuid: 11.1.1
-      vue: 3.5.44(typescript@7.0.2)
-      vue-color: 3.3.3(vue@3.5.44(typescript@7.0.2))
+      vue: 3.5.44(typescript@5.7.3)
 
   '@zumer/snapdom@1.9.9': {}
 
@@ -1240,15 +1225,15 @@ snapshots:
   detect-libc@2.1.2:
     optional: true
 
-  element-plus@2.14.7(vue@3.5.44(typescript@7.0.2)):
+  element-plus@2.14.7(vue@3.5.44(typescript@5.7.3)):
     dependencies:
       '@ctrl/tinycolor': 4.2.1
-      '@element-plus/icons-vue': 2.3.2(vue@3.5.44(typescript@7.0.2))
+      '@element-plus/icons-vue': 2.3.2(vue@3.5.44(typescript@5.7.3))
       '@floating-ui/dom': 1.8.0
       '@popperjs/core': '@sxzz/popperjs-es@2.11.8'
       '@types/lodash': 4.17.27
       '@types/lodash-es': 4.17.12
-      '@vueuse/core': 15.0.0(vue@3.5.44(typescript@7.0.2))
+      '@vueuse/core': 15.0.0(vue@3.5.44(typescript@5.7.3))
       async-validator: 4.2.5
       dayjs: 1.11.23
       lodash: 4.18.1
@@ -1256,7 +1241,7 @@ snapshots:
       lodash-unified: 1.0.3(@types/lodash-es@4.17.12)(lodash-es@4.18.1)(lodash@4.18.1)
       memoize-one: 6.0.0
       normalize-wheel-es: 1.2.0
-      vue: 3.5.44(typescript@7.0.2)
+      vue: 3.5.44(typescript@5.7.3)
       vue-component-type-helpers: 3.3.13
 
   entities@7.0.1: {}
@@ -1397,28 +1382,7 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.7)
       picomatch: 4.0.7
 
-  typescript@7.0.2:
-    optionalDependencies:
-      '@typescript/typescript-aix-ppc64': 7.0.2
-      '@typescript/typescript-darwin-arm64': 7.0.2
-      '@typescript/typescript-darwin-x64': 7.0.2
-      '@typescript/typescript-freebsd-arm64': 7.0.2
-      '@typescript/typescript-freebsd-x64': 7.0.2
-      '@typescript/typescript-linux-arm': 7.0.2
-      '@typescript/typescript-linux-arm64': 7.0.2
-      '@typescript/typescript-linux-loong64': 7.0.2
-      '@typescript/typescript-linux-mips64el': 7.0.2
-      '@typescript/typescript-linux-ppc64': 7.0.2
-      '@typescript/typescript-linux-riscv64': 7.0.2
-      '@typescript/typescript-linux-s390x': 7.0.2
-      '@typescript/typescript-linux-x64': 7.0.2
-      '@typescript/typescript-netbsd-arm64': 7.0.2
-      '@typescript/typescript-netbsd-x64': 7.0.2
-      '@typescript/typescript-openbsd-arm64': 7.0.2
-      '@typescript/typescript-openbsd-x64': 7.0.2
-      '@typescript/typescript-sunos-x64': 7.0.2
-      '@typescript/typescript-win32-arm64': 7.0.2
-      '@typescript/typescript-win32-x64': 7.0.2
+  typescript@5.7.3: {}
 
   uuid@11.1.1: {}
 
@@ -1434,15 +1398,15 @@ snapshots:
       fsevents: 2.3.3
       sass: 1.106.1
 
-  vue-color@3.3.3(vue@3.5.44(typescript@7.0.2)):
+  vue-color@3.3.3(vue@3.5.44(typescript@5.7.3)):
     dependencies:
       material-colors: 1.2.6
       tinycolor2: 1.6.0
-      vue: 3.5.44(typescript@7.0.2)
+      vue: 3.5.44(typescript@5.7.3)
 
   vue-component-type-helpers@3.3.13: {}
 
-  vue@3.5.44(typescript@7.0.2):
+  vue@3.5.44(typescript@5.7.3):
     dependencies:
       '@vue/compiler-dom': 3.5.44
       '@vue/compiler-sfc': 3.5.44
@@ -1450,4 +1414,4 @@ snapshots:
       '@vue/server-renderer': 3.5.44
       '@vue/shared': 3.5.44
     optionalDependencies:
-      typescript: 7.0.2
+      typescript: 5.7.3

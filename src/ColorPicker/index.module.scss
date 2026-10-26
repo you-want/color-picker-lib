@@ -6,6 +6,9 @@
   justify-content: center;
 
   :global {
+    .color-picker-reference { display: inline-flex; }
+    .picker-trigger, .half-picker-trigger { padding: 0; border: 0; appearance: none; background-color: transparent; }
+    .picker-trigger:focus-visible, .half-picker-trigger:focus-visible { outline: 2px solid var(--color-picker-primary, #316bff); outline-offset: 2px; }
     // .colorCss {
     //   width: 250px;
     //   display: flex;
@@ -99,7 +102,7 @@
 
 .palette {
   width: 241px;
-  color: useThemeVar('gray1');
+  color: var(--color-picker-text, #222222);
   background: var(--vc-body-bg, #fff);
   border-radius: 4px;
   overflow: hidden;
@@ -115,7 +118,7 @@
   height: 36px;
   box-sizing: border-box;
   padding: 0 12px;
-  border-bottom: 1px solid useThemeVar('border2');
+  border-bottom: 1px solid var(--color-picker-divider, #ebeef5);
 
   :global(.el-radio) {
     height: 36px;
@@ -135,7 +138,7 @@
   height: 32px;
   box-sizing: border-box;
   padding: 8px 12px;
-  border-bottom: 1px solid useThemeVar('border2');
+  border-bottom: 1px solid var(--color-picker-divider, #ebeef5);
 
   > :first-child {
     flex: 1;
@@ -156,12 +159,12 @@
   box-sizing: border-box;
   border: 2px solid #fff;
   border-radius: 50%;
-  box-shadow: 0 0 0 1px useThemeVar('border1');
+  box-shadow: 0 0 0 1px var(--color-picker-border, #dcdfe6);
   cursor: pointer;
 }
 
 .simple-stop-active {
-  outline: 1px solid useThemeVar('color_primary');
+  outline: 1px solid var(--color-picker-primary, #316bff);
   outline-offset: 1px;
 }
 
@@ -177,15 +180,15 @@
   border: 0;
   border-radius: 2px;
   background: transparent;
-  color: useThemeVar('gray1');
+  color: var(--color-picker-text, #222222);
   cursor: pointer;
 
   &:hover {
-    color: useThemeVar('color_primary');
+    color: var(--color-picker-primary, #316bff);
   }
 
   &:focus-visible {
-    outline: 1px solid useThemeVar('color_primary');
+    outline: 1px solid var(--color-picker-primary, #316bff);
     outline-offset: 2px;
   }
 }
@@ -207,7 +210,7 @@
   height: 36px;
   box-sizing: border-box;
   padding: 11px 12px 8px;
-  border-top: 1px solid useThemeVar('border2');
+  border-top: 1px solid var(--color-picker-divider, #ebeef5);
 }
 
 .recent-colors {
@@ -241,7 +244,7 @@
   &:hover,
   &:focus-visible,
   &.current-color {
-    outline: 1px solid useThemeVar('color_primary');
+    outline: 1px solid var(--color-picker-primary, #316bff);
     outline-offset: 2px;
   }
 
@@ -345,7 +348,7 @@
         border-radius: 3px;
         font-size: 12px;
         font-family: inherit;
-        color: useThemeVar('gray1');
+        color: var(--color-picker-text, #222222);
         text-align: center;
       }
 
@@ -359,7 +362,7 @@
           12px/12px Arial,
           sans-serif;
         text-transform: uppercase;
-        color: useThemeVar('gray1');
+        color: var(--color-picker-text, #222222);
       }
     }
   }

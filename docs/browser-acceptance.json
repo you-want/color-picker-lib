@@ -1,0 +1,150 @@
+[
+  {
+    "evidence": {
+      "dpr": 2,
+      "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+      "viewport": [
+        1730,
+        952
+      ]
+    },
+    "name": "Chrome 环境及错误监听",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "color": "rgba(255, 0, 0, 1)",
+      "focus": true,
+      "hue": "0.0"
+    },
+    "name": "纯色 HEX 输入和零度红色色相、焦点",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "color": "rgba(255, 0, 0, 0.5)"
+    },
+    "name": "透明度输入与预览",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "commits": 1,
+      "focus": true
+    },
+    "name": "Escape 关闭回焦且只提交一次",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "color": "linear-gradient(180deg, rgba(255, 0, 0, 1) 0%, rgba(255, 0, 0, 0.5) 50%, rgba(255, 0, 0, 0) 100%)"
+    },
+    "name": "渐变模式与添加中间色标",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "stops": 2
+    },
+    "name": "色标方向键、Home、End、删除",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "position": "25"
+    },
+    "name": "真实布局鼠标拖动色标",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "before": "linear-gradient(180deg,rgba(255, 0, 0, 1) 25%,rgba(255, 0, 0, 0) 100%)",
+      "flipped": "linear-gradient(270deg, rgba(255, 0, 0, 0) 25%, rgba(255, 0, 0, 1) 100%)",
+      "rotated": "linear-gradient(270deg, rgba(255, 0, 0, 1) 25%, rgba(255, 0, 0, 0) 100%)"
+    },
+    "name": "渐变旋转和翻转",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "storage": [
+        {
+          "colors": [
+            "linear-gradient(270deg, rgba(255, 0, 0, 0) 25%, rgba(255, 0, 0, 1) 100%)",
+            "rgba(255, 0, 0, 0.5)",
+            "rgba(255, 0, 0, 1)",
+            "linear-gradient(180deg, rgba(255, 0, 0, 1) 0%, rgba(255, 0, 0, 0) 100%)"
+          ],
+          "userId": "demo-user"
+        }
+      ]
+    },
+    "name": "历史颜色提交及选择",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "point": {
+        "x": 535,
+        "y": 174.9375
+      },
+      "text": "点击画布取色，Esc 或右键取消\n退出取色\nR:11 G:16 B:32 #0B1020"
+    },
+    "name": "真实 snapdom 截图像素与放大镜",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "color": "rgba(11, 16, 32, 1)"
+    },
+    "name": "确认回填及浮层清理",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "modes": [
+        "Escape",
+        "contextmenu",
+        "button",
+        "outside"
+      ],
+      "unchanged": "rgba(11, 16, 32, 1)"
+    },
+    "name": "取消、重试和边界外退出",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "dpr": 2,
+      "scrollTest": 80
+    },
+    "name": "页面滚动后真实取色坐标",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "closed": true
+    },
+    "name": "点击面板外部关闭",
+    "passed": true
+  },
+  {
+    "evidence": {
+      "commits": [
+        [
+          "rgba(255, 0, 0, 0.5)"
+        ],
+        [
+          "linear-gradient(270deg, rgba(255, 0, 0, 0) 25%, rgba(255, 0, 0, 1) 100%)"
+        ],
+        [
+          "rgba(11, 16, 32, 1)"
+        ]
+      ],
+      "errors": [],
+      "warnings": []
+    },
+    "name": "错误与警告审查",
+    "passed": true
+  }
+]

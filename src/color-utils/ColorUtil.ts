@@ -1,3 +1,5 @@
+import { COLOR_NAMES } from './colorNames'
+
 export interface RGBAColor {
   r: number
   g: number
@@ -35,7 +37,7 @@ export function combineColorWithOpacity(colorStr: string, opacity: number, optio
     if (config.normalizeOpacity && opacity > 1) {
       normalizedOpacity = opacity / 100
     }
-    normalizedOpacity = Math.max(0, Math.min(1, normalizedOpacity))
+    normalizedOpacity = clamp(normalizedOpacity, 0, 1)
 
     // 更新透明度
     rgba.a = normalizedOpacity
@@ -57,7 +59,7 @@ export function combineColorWithOpacity(colorStr: string, opacity: number, optio
  * 转为 SketchPicker 的 :value（必须用 rgba 且 a 为 0–1，否则 hex8 时 A 框会固定显示 1）
  */
 export function toSketchPickerColorValue(color: string, fillOpacityPercent = 100): string {
-  if (!color || color.includes('linear-gradient')) {
+  if (!color || parseGradient(color)) {
     return color || '#FFFFFF'
   }
   let parsed: ReturnType<typeof parseColorToRGBA>
@@ -66,217 +68,57 @@ export function toSketchPickerColorValue(color: string, fillOpacityPercent = 100
   } catch {
     return color || '#FFFFFF'
   }
-  const clean = color.replace(/\s+/g, '')
-  let alpha = parsed.a
-  // 6 位 hex / rgb：透明度来自右侧面板 fillOpacity
-  if (
-    (clean.startsWith('#') && clean.length === 7)
-    || (clean.startsWith('rgb(') && !clean.startsWith('rgba('))
-  ) {
-    alpha = Math.max(0, Math.min(1, fillOpacityPercent / 100))
-  }
+  const clean = color.trim().toLowerCase()
+  const explicitAlpha = clean === 'transparent'
+    || /^#?(?:[\da-f]{4}|[\da-f]{8})$/i.test(clean)
+    || (/^(?:rgba?|hsla?)\(/.test(clean) && (clean.includes('/') || clean.split(',').length === 4))
+  const alpha = explicitAlpha ? parsed.a : clamp(fillOpacityPercent / 100, 0, 1)
   return `rgba(${Math.round(parsed.r)}, ${Math.round(parsed.g)}, ${Math.round(parsed.b)}, ${alpha})`
 }
 
 /** vue-color SketchPicker @input  payload → 带透明度的 rgba / hex 字符串 */
 export function sketchPickerInputToColorString(colors: unknown): string {
-  if (typeof colors === 'string') {
-    return colorToRGBA(colors)
-  }
-  if (!colors || typeof colors !== 'object') {
-    return ''
-  }
-  const payload = colors as {
-    hex?: string
-    hex8?: string
-    a?: number
-    rgba?: { r: number, g: number, b: number, a: number }
-  }
-  if (payload.rgba) {
-    const { r, g, b, a } = payload.rgba
-    return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a})`
-  }
-  if (payload.hex8) {
-    return colorToRGBA(payload.hex8)
-  }
-  if (payload.hex) {
-    const alpha = payload.a ?? 1
-    if (alpha < 1) {
-      const base = parseColorToRGBA(payload.hex)
-      return `rgba(${base.r}, ${base.g}, ${base.b}, ${alpha})`
+  try {
+    if (typeof colors === 'string') return colorToRGBA(colors)
+    if (!colors || typeof colors !== 'object') return ''
+    const payload = colors as { hex?: string, hex8?: string, a?: number, rgba?: RGBAColor }
+    if (payload.rgba) {
+      const { r, g, b, a } = payload.rgba
+      if (![r, g, b, a].every(value => typeof value === 'number' && Number.isFinite(value))) return ''
+      return formatColor({ r: Math.round(clamp(r, 0, 255)), g: Math.round(clamp(g, 0, 255)), b: Math.round(clamp(b, 0, 255)), a: clamp(a, 0, 1) })
     }
-    return colorToRGBA(payload.hex)
+    if (payload.hex8) return colorToRGBA(payload.hex8)
+    if (payload.hex) return colorToRGBA(payload.hex, payload.a ?? null)
+  } catch {
+    // 输入过程中的不完整 payload 不提交给宿主。
   }
   return ''
 }
 
-export function colorToRGBA(colorString: string, alpha = null) {
-  if (!colorString || typeof colorString !== 'string') {
-    throw new Error('Invalid color string')
-  }
-
-  // 统一处理为小写并去除空格
-  colorString = colorString.trim().toLowerCase()
-  // 处理 transparent 关键字
-  if (colorString === 'transparent') {
-    return 'rgba(0, 0, 0, 0)'
-  }
-  // HSV 格式: hsv(240, 100%, 100%)
-  if (colorString.startsWith('hsv(')) {
-    return hsvToRGBA(colorString, 1)
-  }
-  // --- 新增: HSL 和 HSLA 格式 ---
-  // 同时匹配 hsl( 和 hsla(
-  if (colorString.startsWith('hsl(') || colorString.startsWith('hsla(')) {
-    return hslToRGBA(colorString, alpha)
-  }
-
-  // HSVA 格式: hsva(240, 100%, 100%, 0.5)
-  if (colorString.startsWith('hsva(')) {
-    return hsvaToRGBA(colorString, alpha)
-  }
-
-  // 十六进制格式: #ff0000 或 #ff0000ff（带透明度）
-  if (colorString.startsWith('#')) {
-    return hexToRGBA(colorString, alpha)
-  }
-
-  // 如果已经是 RGBA 或 RGB，直接返回或添加透明度
-  if (colorString.startsWith('rgba(') || colorString.startsWith('rgb(')) {
-    return handleRGB(colorString, alpha)
-  }
-
-  throw new Error(`Unsupported color format: ${colorString}`)
-}
-/**
- * 新增辅助函数: 解析 HSL/HSLA 字符串并转换为 RGBA
- * 例如: hsl(17, 80%, 45%) -> rgba(206, 75, 23, 1)
- */
-function hslToRGBA(hslString: string, alphaOverride: number | null): string {
-  // 正则匹配:
-  // 1. 捕获 hue (数字)
-  // 2. 捕获 saturation (数字，忽略%)
-  // 3. 捕获 lightness (数字，忽略%)
-  // 4. 可选捕获 alpha (数字)
-  const match = hslString.match(/hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%(?:\s*,\s*([\d.]+))?\s*\)/)
-
-  if (!match) {
-    throw new Error(`Invalid HSL format: ${hslString}`)
-  }
-
-  const h = Number.parseFloat(match[1]) // Hue (0-360)
-  const s = Number.parseFloat(match[2]) / 100 // Saturation (0-1)
-  const l = Number.parseFloat(match[3]) / 100 // Lightness (0-1)
-
-  // 优先使用传入的 alpha，其次使用字符串里的 alpha，最后默认为 1
-  let a = 1
-  if (alphaOverride !== null) {
-    a = alphaOverride
-  } else if (match[4]) {
-    a = Number.parseFloat(match[4])
-  }
-
-  // HSL 转 RGB 算法
-  const c = (1 - Math.abs(2 * l - 1)) * s
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
-  const m = l - c / 2
-
-  let r = 0
-  let g = 0
-  let b = 0
-
-  if (h >= 0 && h < 60) {
-    r = c
-    g = x
-    b = 0
-  } else if (h >= 60 && h < 120) {
-    r = x
-    g = c
-    b = 0
-  } else if (h >= 120 && h < 180) {
-    r = 0
-    g = c
-    b = x
-  } else if (h >= 180 && h < 240) {
-    r = 0
-    g = x
-    b = c
-  } else if (h >= 240 && h < 300) {
-    r = x
-    g = 0
-    b = c
-  } else if (h >= 300 && h < 360) {
-    r = c
-    g = 0
-    b = x
-  }
-
-  // 转为 0-255 并取整
-  const finalR = Math.round((r + m) * 255)
-  const finalG = Math.round((g + m) * 255)
-  const finalB = Math.round((b + m) * 255)
-
-  return `rgba(${finalR}, ${finalG}, ${finalB}, ${a})`
+export function colorToRGBA(colorString: string, alpha: number | null = null): string {
+  if (!colorString || typeof colorString !== 'string') throw new Error('Invalid color string')
+  const color = colorString.trim().toLowerCase()
+  const parsed = parseColorToRGBA(color)
+  return formatColor({ ...parsed, a: alpha === null ? parsed.a : clamp(alpha, 0, 1) })
 }
 /**
  * HSV 转 RGBA
  */
-export function hsvToRGBA(hsvString: string, alpha = 1) {
-  const match = hsvString.match(/hsv\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/)
-  if (!match) {
-    throw new Error('Invalid HSV color format. Expected: hsv(240, 100%, 100%)')
-  }
-
-  const h = Number.parseInt(match[1]) // 0-360
-  const s = Number.parseInt(match[2]) // 0-100
-  const v = Number.parseInt(match[3]) // 0-100
-
-  const rgb = hsvToRGB(h, s, v)
-  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`
+export function hsvToRGBA(hsvString: string, alpha = 1): string {
+  return formatColor({ ...hsvStringToRGBA(hsvString.trim().toLowerCase()), a: clamp(alpha, 0, 1) })
 }
 
-/**
- * HSVA 转 RGBA
- */
-export function hsvaToRGBA(hsvaString: string, alpha = null) {
-  const match = hsvaString.match(/hsva\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*,\s*([\d.]+)\s*\)/)
-  if (!match) {
-    throw new Error('Invalid HSVA color format. Expected: hsva(240, 100%, 100%, 0.5)')
-  }
-
-  const h = Number.parseInt(match[1])
-  const s = Number.parseInt(match[2])
-  const v = Number.parseInt(match[3])
-  const a = alpha !== null ? alpha : Number.parseFloat(match[4])
-
-  const rgb = hsvToRGB(h, s, v)
-  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`
+/** HSVA 转 RGBA，未显式覆盖 alpha 时保留原值。 */
+export function hsvaToRGBA(hsvaString: string, alpha: number | null = null): string {
+  const parsed = hsvStringToRGBA(hsvaString.trim().toLowerCase())
+  return formatColor({ ...parsed, a: alpha === null ? parsed.a : clamp(alpha, 0, 1) })
 }
 /**
  * 处理 RGB/RGBA 颜色
  */
-export function handleRGB(rgbString: string, alpha = null) {
-  // RGBA 格式
-  const rgbaMatch = rgbString.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/)
-  if (rgbaMatch) {
-    const r = rgbaMatch[1]
-    const g = rgbaMatch[2]
-    const b = rgbaMatch[3]
-    const a = alpha !== null ? alpha : Number.parseFloat(rgbaMatch[4])
-    return `rgba(${r}, ${g}, ${b}, ${a})`
-  }
-
-  // RGB 格式
-  const rgbMatch = rgbString.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/)
-  if (rgbMatch) {
-    const r = rgbMatch[1]
-    const g = rgbMatch[2]
-    const b = rgbMatch[3]
-    const a = alpha !== null ? alpha : 1
-    return `rgba(${r}, ${g}, ${b}, ${a})`
-  }
-
-  throw new Error('Invalid RGB color format')
+export function handleRGB(rgbString: string, alpha: number | null = null): string {
+  const parsed = rgbStringToRGBA(rgbString.trim().toLowerCase())
+  return formatColor({ ...parsed, a: alpha === null ? parsed.a : clamp(alpha, 0, 1) })
 }
 
 /**
@@ -320,46 +162,17 @@ export function hsvToRGB(h: number, s: number, v: number) {
 /**
  * 十六进制转 RGBA
  */
-export function hexToRGBA(hexString: string, alpha = null) {
-  // 移除 # 号
-  let hex = hexString.replace('#', '')
-
-  // 处理 3位十六进制 (#rgb)
-  if (hex.length === 3) {
-    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2]
-  }
-
-  // 处理 4位十六进制 (#rgba) - 包含透明度
-  if (hex.length === 4) {
-    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3]
-  }
-
-  // 处理 6位十六进制 (#rrggbb)
-  if (hex.length === 6) {
-    const r = Number.parseInt(hex.substr(0, 2), 16)
-    const g = Number.parseInt(hex.substr(2, 2), 16)
-    const b = Number.parseInt(hex.substr(4, 2), 16)
-    const a = alpha !== null ? alpha : 1
-    return `rgba(${r}, ${g}, ${b}, ${a})`
-  }
-
-  // 处理 8位十六进制 (#rrggbbaa) - 包含透明度
-  if (hex.length === 8) {
-    const r = Number.parseInt(hex.substr(0, 2), 16)
-    const g = Number.parseInt(hex.substr(2, 2), 16)
-    const b = Number.parseInt(hex.substr(4, 2), 16)
-    const a = alpha !== null ? alpha : Number.parseInt(hex.substr(6, 2), 16) / 255
-    return `rgba(${r}, ${g}, ${b}, ${a})`
-  }
-
-  throw new Error('Invalid hex color format. Expected: #rgb, #rgba, #rrggbb, or #rrggbbaa')
+export function hexToRGBA(hexString: string, alpha: number | null = null): string {
+  const parsed = hexToRGBAObj(hexString.trim())
+  return formatColor({ ...parsed, a: alpha === null ? parsed.a : clamp(alpha, 0, 1) })
 }
 /**
  * 解析颜色字符串为RGBA对象
  */
 export function parseColorToRGBA(colorStr: string, fallbackColor = '#000000'): RGBAColor {
-  if (!colorStr || typeof colorStr !== 'string') {
-    return parseColorToRGBA(fallbackColor)
+  if (!colorStr || typeof colorStr !== 'string' || !colorStr.trim()) {
+    if (!fallbackColor?.trim()) throw new Error('Invalid fallback color')
+    colorStr = fallbackColor
   }
 
   const color = colorStr.trim().toLowerCase()
@@ -375,6 +188,8 @@ export function parseColorToRGBA(colorStr: string, fallbackColor = '#000000'): R
   }
 
   // hsl/hsla颜色
+  if (color.startsWith('hsv')) return hsvStringToRGBA(color)
+
   if (color.startsWith('hsl')) {
     return hslStringToRGBA(color)
   }
@@ -396,73 +211,85 @@ export function parseColorToRGBA(colorStr: string, fallbackColor = '#000000'): R
 /**
  * 十六进制转RGBA
  */
-function hexToRGBAObj(hex: string) {
-  let hexClean = hex.replace(/^#/, '')
+const CSS_NUMBER = '[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?'
+const NUMBER_TOKEN = new RegExp(`^${CSS_NUMBER}(%)?$`, 'i')
+const ANGLE_TOKEN = new RegExp(`^(${CSS_NUMBER})(deg|grad|rad|turn)?$`, 'i')
 
-  // 处理简写格式
-  if (hexClean.length === 3) {
-    hexClean = hexClean.split('').map(c => c + c).join('')
-  } else if (hexClean.length === 4) {
-    hexClean = hexClean.split('').map(c => c + c).join('')
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) throw new Error('Color channels must be finite')
+  return Math.max(min, Math.min(max, value))
+}
+
+function channel(token: string, max: number): number {
+  const match = token.match(NUMBER_TOKEN)
+  if (!match) throw new Error(`Invalid color channel: ${token}`)
+  return clamp(Number.parseFloat(token) * (match[1] ? max / 100 : 1), 0, max)
+}
+
+function angleDegrees(value: string): number {
+  const match = value.trim().match(ANGLE_TOKEN)
+  if (!match) throw new Error(`Invalid angle: ${value}`)
+  const number = Number(match[1])
+  const unit = match[2]?.toLowerCase()
+  const degrees = number * (unit === 'turn' ? 360 : unit === 'grad' ? 0.9 : unit === 'rad' ? 180 / Math.PI : 1)
+  if (!Number.isFinite(degrees)) throw new Error(`Invalid angle: ${value}`)
+  return degrees
+}
+
+function functionChannels(value: string, kind: 'rgb' | 'hsl' | 'hsv'): string[] {
+  const match = value.match(new RegExp(`^${kind}a?\\(([^()]*)\\)$`, 'i'))
+  if (!match) throw new Error(`Invalid ${kind} color: ${value}`)
+  const body = match[1].trim()
+  const tokens = body.includes(',') ? body.split(/\s*,\s*/) : body.split(/\s*\/\s*/)
+  const parts = body.includes(',') ? tokens : [...tokens[0].split(/\s+/), ...tokens.slice(1)]
+  if (!body.includes(',') && tokens[0].split(/\s+/).length !== 3) throw new Error(`Invalid ${kind} channels: ${value}`)
+  if (tokens.length > (body.includes(',') ? 4 : 2) || ![3, 4].includes(parts.length) || parts.some(part => !part)) {
+    throw new Error(`Invalid ${kind} channels: ${value}`)
   }
+  return parts
+}
 
-  // 验证长度
-  if (![6, 8].includes(hexClean.length)) {
+function hexToRGBAObj(hex: string): RGBAColor {
+  let clean = hex.replace(/^#/, '')
+  if (!/^(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(clean)) {
     throw new Error(`无效的十六进制颜色: ${hex}`)
   }
-
-  const r = Number.parseInt(hexClean.substring(0, 2), 16)
-  const g = Number.parseInt(hexClean.substring(2, 4), 16)
-  const b = Number.parseInt(hexClean.substring(4, 6), 16)
-  let a = 1
-
-  if (hexClean.length === 8) {
-    a = Number.parseInt(hexClean.substring(6, 8), 16) / 255
+  if (clean.length <= 4) clean = [...clean].map(c => c + c).join('')
+  return {
+    r: Number.parseInt(clean.slice(0, 2), 16),
+    g: Number.parseInt(clean.slice(2, 4), 16),
+    b: Number.parseInt(clean.slice(4, 6), 16),
+    a: clean.length === 8 ? Number.parseInt(clean.slice(6, 8), 16) / 255 : 1,
   }
-
-  return { r, g, b, a }
 }
 
-/**
- * RGB字符串转RGBA
- */
-function rgbStringToRGBA(rgbString: string) {
-  const match = rgbString.match(
-    /rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([\d.]+)\s*)?\)/i,
-  )
-
-  if (!match) {
-    throw new Error(`无效的RGB颜色: ${rgbString}`)
+function rgbStringToRGBA(value: string): RGBAColor {
+  const parts = functionChannels(value, 'rgb')
+  return {
+    r: Math.round(channel(parts[0], 255)),
+    g: Math.round(channel(parts[1], 255)),
+    b: Math.round(channel(parts[2], 255)),
+    a: parts[3] === undefined ? 1 : channel(parts[3], 1),
   }
-
-  const r = Math.min(255, Number.parseInt(match[1], 10))
-  const g = Math.min(255, Number.parseInt(match[2], 10))
-  const b = Math.min(255, Number.parseInt(match[3], 10))
-  const a = match[4] ? Number.parseFloat(match[4]) : 1
-
-  return { r, g, b, a }
 }
 
-/**
- * HSL字符串转RGBA
- */
-function hslStringToRGBA(hslString: string) {
-  const match = hslString.match(
-    /hsla?\(\s*(\d{1,3})\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*(?:,\s*([\d.]+)\s*)?\)/i,
-  )
-
-  if (!match) {
-    throw new Error(`无效的HSL颜色: ${hslString}`)
+function hslStringToRGBA(value: string): RGBAColor {
+  const parts = functionChannels(value, 'hsl')
+  if (!parts[1].endsWith('%') || !parts[2].endsWith('%')) throw new Error(`Invalid HSL percentages: ${value}`)
+  const hue = ((angleDegrees(parts[0]) % 360) + 360) % 360
+  return {
+    ...hslToRGB(hue / 360, channel(parts[1], 1), channel(parts[2], 1)),
+    a: parts[3] === undefined ? 1 : channel(parts[3], 1),
   }
+}
 
-  const h = Number.parseInt(match[1], 10) / 360
-  const s = Number.parseInt(match[2], 10) / 100
-  const l = Number.parseInt(match[3], 10) / 100
-  const a = match[4] ? Number.parseFloat(match[4]) : 1
-
-  // HSL转RGB
-  const rgb = hslToRGB(h, s, l)
-  return { ...rgb, a }
+function hsvStringToRGBA(value: string): RGBAColor {
+  const parts = functionChannels(value, 'hsv')
+  if (!parts[1].endsWith('%') || !parts[2].endsWith('%')) throw new Error(`Invalid HSV percentages: ${value}`)
+  return {
+    ...hsvToRGB(angleDegrees(parts[0]), channel(parts[1], 100), channel(parts[2], 100)),
+    a: parts[3] === undefined ? 1 : channel(parts[3], 1),
+  }
 }
 
 /**
@@ -511,22 +338,10 @@ function hslToRGB(h: number, s: number, l: number) {
 /**
  * 颜色名称转RGBA
  */
-function colorNameToRGBA(colorName: string) {
-  const colors: Record<string, RGBAColor> = {
-    black: { r: 0, g: 0, b: 0, a: 1 },
-    white: { r: 255, g: 255, b: 255, a: 1 },
-    red: { r: 255, g: 0, b: 0, a: 1 },
-    green: { r: 0, g: 255, b: 255, a: 1 },
-    blue: { r: 0, g: 0, b: 255, a: 1 },
-    yellow: { r: 255, g: 255, b: 0, a: 1 },
-    cyan: { r: 0, g: 255, b: 255, a: 1 },
-    magenta: { r: 255, g: 0, b: 255, a: 1 },
-    gray: { r: 128, g: 128, b: 128, a: 1 },
-    grey: { r: 128, g: 128, b: 128, a: 1 },
-    transparent: { r: 0, g: 0, b: 0, a: 0 },
-  }
-
-  return colors[colorName.toLowerCase()] || null
+function colorNameToRGBA(colorName: string): RGBAColor | null {
+  if (colorName === 'transparent') return { r: 0, g: 0, b: 0, a: 0 }
+  const hex = Object.prototype.hasOwnProperty.call(COLOR_NAMES, colorName) ? COLOR_NAMES[colorName] : undefined
+  return hex ? hexToRGBAObj(hex) : null
 }
 
 /**
@@ -568,7 +383,7 @@ function formatColor(rgba: RGBAColor, format = 'rgba'): string {
  */
 export function rgbToHex(r: number, g: number, b: number, includeAlpha = false, a?: number) {
   const toHex = (num: number) => {
-    const hex = Math.round(num).toString(16)
+    const hex = Math.round(clamp(num, 0, 255)).toString(16)
     return hex.length === 1 ? `0${hex}` : hex
   }
 
@@ -658,7 +473,8 @@ export function gradientAngleToDegrees(angle: string): number {
     'to top left': 315,
     'to left top': 315,
   }
-  return directions[angle.trim().toLowerCase()] ?? (Number.parseFloat(angle) || 0)
+  const value = angle.trim().toLowerCase().replace(/\s+/g, ' ')
+  return Object.prototype.hasOwnProperty.call(directions, value) ? directions[value] : angleDegrees(value)
 }
 
 export function parseGradient(str: string) {
@@ -677,16 +493,19 @@ export function parseGradient(str: string) {
     }
     if (char === ')') {
       depth--
+      if (depth < 0) return null
     }
     if (char === ',' && depth === 0) {
       parts.push(match[1].slice(start, i).trim())
       start = i + 1
     }
   }
+  if (depth !== 0) return null
   parts.push(match[1].slice(start).trim())
   let angle = '180deg'
-  if (/^(?:[+-]?(?:\d+(?:\.\d+)?|\.\d+)deg|to [a-z ]+)$/i.test(parts[0])) {
+  if (/^(?:[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:deg|grad|rad|turn)|to [a-z ]+)$/i.test(parts[0])) {
     angle = parts.shift()!
+    try { gradientAngleToDegrees(angle) } catch { return null }
   }
   const colorStops = parts.map((part) => {
     const stop = part.match(/^(\S(?:.*\S)?)\s+([+-]?(?:\d+(?:\.\d+)?|\.\d+))%$/)
@@ -754,225 +573,34 @@ export function interpolateGradientColor(stops: { position: number, color: strin
 }
 // 纯JS版本（不依赖DOM，支持常见格式）
 export function extractColorHexStringsPureJS(colorStr: string) {
-  if (!colorStr || (colorStr && colorStr.includes('linear-gradient'))) {
-    return
-  }
-  // 颜色关键字映射
-  const colorKeywords: any = {
-    red: '#FF0000',
-    green: '#00FF00',
-    blue: '#0000FF',
-    white: '#FFFFFF',
-    black: '#000000',
-    gray: '#808080',
-    yellow: '#FFFF00',
-    cyan: '#00FFFF',
-    magenta: '#FF00FF',
-    silver: '#C0C0C0',
-    maroon: '#800000',
-    olive: '#808000',
-    lime: '#00FF00',
-    aqua: '#00FFFF',
-    teal: '#008080',
-    navy: '#000080',
-    fuchsia: '#FF00FF',
-    purple: '#800080',
-  }
-
-  let r
-  let g
-  let b
-  let a = 1
-
-  // 处理颜色关键字
-  const lowerColorStr = colorStr.toLowerCase().trim()
-  if (colorKeywords[lowerColorStr]) {
-    const hex = colorKeywords[lowerColorStr]
-    r = Number.parseInt(hex.slice(1, 3), 16)
-    g = Number.parseInt(hex.slice(3, 5), 16)
-    b = Number.parseInt(hex.slice(5, 7), 16)
-  } else if (/^#?[0-9a-f]{3,4}$/i.test(colorStr)) {
-    // 处理 #RGB 或 #RGBA 格式
-    const hex = colorStr.replace('#', '')
-    const is3Digit = hex.length === 3
-    r = Number.parseInt(hex[0] + (is3Digit ? hex[0] : hex[0]), 16)
-    g = Number.parseInt(hex[1] + (is3Digit ? hex[1] : hex[1]), 16)
-    b = Number.parseInt(hex[2] + (is3Digit ? hex[2] : hex[2]), 16)
-    if (hex.length === 4) {
-      a = Number.parseInt(hex[3] + hex[3], 16) / 255
-    }
-  } else if (/^#?[0-9a-f]{6,8}$/i.test(colorStr)) {
-    // 处理 #RRGGBB 或 #RRGGBBAA 格式
-    const hex = colorStr.replace('#', '')
-    r = Number.parseInt(hex.slice(0, 2), 16)
-    g = Number.parseInt(hex.slice(2, 4), 16)
-    b = Number.parseInt(hex.slice(4, 6), 16)
-    if (hex.length === 8) {
-      a = Number.parseInt(hex.slice(6, 8), 16) / 255
-    }
-  } else if (/^rgba?\(/i.test(colorStr)) {
-    // 处理 rgb() 或 rgba() 格式
-    const match = colorStr.match(/(\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/)
-    if (match) {
-      r = Number.parseInt(match[1])
-      g = Number.parseInt(match[2])
-      b = Number.parseInt(match[3])
-      if (match[4]) {
-        a = Number.parseFloat(match[4])
-      }
-    }
-  } else {
-    throw new Error('不支持的颜色格式')
-    // return
-  }
-
-  // 确保值在范围内
-  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
-  r = clamp(r!, 0, 255)
-  g = clamp(g!, 0, 255)
-  b = clamp(b!, 0, 255)
-  a = clamp(a!, 0, 1)
-
-  // 转换函数
-  const toHex = (n: number) => {
-    const hex = Math.round(n).toString(16)
-    return hex.length === 1 ? `0${hex}` : hex
-  }
-
-  // 六位十六进制（无透明度）
-  const opaqueHex = `#${toHex(r)}${toHex(g)}${toHex(b)}`
-
-  // 八位十六进制（带透明度）
-  const alphaValue = Math.round(a * 255)
-  const alphaHex = `#${toHex(r)}${toHex(g)}${toHex(b)}${toHex(alphaValue)}`
-
+  if (!colorStr || parseGradient(colorStr)) return
+  const parsed = parseColorToRGBA(colorStr)
   return {
-    opaqueHex: opaqueHex.toUpperCase(),
-    alphaHex: alphaHex.toUpperCase(),
-    rgba: { r, g, b, a },
+    opaqueHex: rgbToHex(parsed.r, parsed.g, parsed.b).toUpperCase(),
+    alphaHex: rgbToHex(parsed.r, parsed.g, parsed.b, true, parsed.a).toUpperCase(),
+    rgba: parsed,
   }
 }
-/**
- * 高级版本：检测颜色字符串的透明度，返回透明度值
- * @param {string} colorString - 颜色字符串
- * @returns {object} - 包含透明度信息和原始透明度值
- */
+
+/** 统一按颜色解析器检测透明度；无效输入使用不透明回退。 */
 export function analyzeTransparency(colorString: string) {
   if (!colorString || typeof colorString !== 'string') {
-    return {
-      isTransparent: false,
-      alphaValue: 1,
-      rawString: colorString,
-      message: '无效的颜色字符串',
-    }
+    return { isTransparent: false, alphaValue: 1, rawString: colorString, message: '无效的颜色字符串' }
   }
-
-  const color = colorString.toLowerCase().trim()
-  let alphaValue = 1 // 默认完全不透明
-  let isTransparent = false
-  let format = 'unknown'
-
-  // 处理十六进制
-  if (color.startsWith('#')) {
-    format = 'hex'
-    const hex = color.slice(1)
-
-    if (hex.length === 8) {
-      // #RRGGBBAA 格式
-      const alphaHex = hex.slice(6, 8)
-      alphaValue = Number.parseInt(alphaHex, 16) / 255
-    } else if (hex.length === 4) {
-      // #RGBA 格式
-      const alphaHex = hex.slice(3, 4)
-      alphaValue = Number.parseInt(alphaHex + alphaHex, 16) / 255
-    }
-    // 其他十六进制格式默认alpha为1
-
-    isTransparent = alphaValue < 0.001
-  } else if (color.startsWith('rgb')) {
-    format = color.startsWith('rgba') ? 'rgba' : 'rgb'
-    const rgbMatch = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/)
-
-    if (rgbMatch && rgbMatch[4]) {
-      alphaValue = Number.parseFloat(rgbMatch[4])
-    }
-    // RGB格式默认alpha为1
-
-    isTransparent = Math.abs(alphaValue) < 0.001
-  } else if (color === 'transparent') {
-    format = 'named'
-    alphaValue = 0
-    isTransparent = true
-  }
+  const color = colorString.trim().toLowerCase()
+  const alphaValue = getColorOpacity(color)
+  const isTransparent = alphaValue < 0.001
+  const format = color.startsWith('#') ? 'hex'
+    : color.match(/^(rgba?|hsla?)\(/)?.[1]
+      ?? (Object.prototype.hasOwnProperty.call(COLOR_NAMES, color) || color === 'transparent' ? 'named' : 'unknown')
   return {
-    isTransparent,
-    alphaValue,
-    format,
-    rawString: colorString,
+    isTransparent, alphaValue, format, rawString: colorString,
     description: isTransparent ? '完全透明' : `透明度: ${(1 - alphaValue).toFixed(2)}`,
   }
 }
-/**
- * 提取颜色字符串中的透明度 (Alpha值)
- * @param {string} color - 颜色字符串 (如 #ff0000, rgba(0,0,0,0.5), #00000080)
- * @returns {number} 透明度值 (0 - 1 之间)，如果无法解析则返回 1
- */
-export function getColorOpacity(color: string) {
-  if (!color) {
-    return 1
-  }
 
-  // 1. 移除所有空格并转为小写，便于处理
-  const cleanColor = color.replace(/\s+/g, '').toLowerCase()
-
-  // 2. 特殊关键字处理
-  if (cleanColor === 'transparent') {
-    return 0
-  }
-
-  // 3. 处理 Hex 格式 (例如: #fff, #ffffff, #fff8, #ffffff80)
-  if (cleanColor.startsWith('#')) {
-    const hex = cleanColor.slice(1) // 去掉 #
-
-    // #RRGGBBAA (8位)
-    if (hex.length === 8) {
-      const alphaHex = hex.slice(6, 8)
-      const alphaDecimal = Number.parseInt(alphaHex, 16)
-      // 保留2位小数，并转回数字类型（如果需要字符串则去掉 Number()）
-      return Number((alphaDecimal / 255).toFixed(2))
-    }
-    // #RGBA (4位)
-    if (hex.length === 4) {
-      return Number.parseInt(hex.slice(3, 4), 16) / 15
-    }
-    // #RGB 或 #RRGGBB (没有透明度位)
-    return 1
-  }
-
-  // 4. 处理 RGBA 或 HSLA 格式
-  // 匹配 rgba(...) 或 hsla(...) 中的最后一个数值
-  // 支持逗号分隔 rgba(0,0,0,0.5) 或 CSS4 斜杠语法 rgba(0 0 0 / 0.5)
-  if (cleanColor.startsWith('rgba') || cleanColor.startsWith('hsla')) {
-    // 尝试匹配括号内最后一个数值
-    // 逻辑：查找最后一个逗号或斜杠后的数字
-    const match = cleanColor.match(/([0-9.]+)\)$/)
-    // 也可以使用更通用的分割法：
-    // const parts = cleanColor.split(/[,/]/);
-
-    if (match && match[1]) {
-      const alpha = Number.parseFloat(match[1])
-
-      // 如果是百分比 (例如 50%)，转换为小数
-      if (cleanColor.includes('%') && match[0].includes('%')) { // 简单判断，严谨需更复杂正则
-        // 注意：标准CSS中rgba的alpha通常不带%，但hsla的s和l带。
-        // 这里的正则取出的通常是纯数字，除非包含%字符
-      }
-
-      // 修正范围 (防止无效输入)
-      return Math.min(1, Math.max(0, alpha))
-    }
-  }
-
-  // 5. RGB, HSL 或其他无法识别的格式，默认视为不透明
-  return 1
+/** 提取 alpha，支持 HEX / RGB(A) / HSL(A) 及百分比、斜杠语法。 */
+export function getColorOpacity(color: string): number {
+  if (!color?.trim()) return 1
+  try { return parseColorToRGBA(color).a } catch { return 1 }
 }

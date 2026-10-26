@@ -9,7 +9,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 defineOptions({ name: 'EyeDropper' })
 const props = defineProps<{
   target?: HTMLElement
-  /** 是否使用原生 EyeDropper（默认自动检测），不支持则回退截图方案并提示。 */
+  /** 是否检测并提示原生 API 支持情况；取色交互始终使用截图放大镜。 */
   native?: boolean
   /** 截图选项透传。 */
   capture?: CaptureCanvasOptions
@@ -40,17 +40,19 @@ let snapshot: {
 } | null = null
 
 const containerStyle = computed(() => {
+  const viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth
+  const viewportHeight = typeof window === 'undefined' ? 768 : window.innerHeight
   let left = mouse.value.x + 20
   let top = mouse.value.y - LENS_SIZE - 16
-  if (left + LENS_SIZE > window.innerWidth - 8) {
+  if (left + LENS_SIZE > viewportWidth - 8) {
     left = mouse.value.x - LENS_SIZE - 20
   }
   if (top < 8) {
     top = mouse.value.y + 24
   }
   return {
-    left: `${Math.max(8, Math.min(left, window.innerWidth - LENS_SIZE - 8))}px`,
-    top: `${Math.max(8, Math.min(top, window.innerHeight - LENS_SIZE - 8))}px`,
+    left: `${Math.max(8, Math.min(left, viewportWidth - LENS_SIZE - 8))}px`,
+    top: `${Math.max(8, Math.min(top, viewportHeight - LENS_SIZE - 8))}px`,
   }
 })
 

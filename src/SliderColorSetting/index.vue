@@ -172,6 +172,7 @@ const handleStyle = computed(() => {
 
 // 滑块点击
 function handleClick(slider: any) {
+  if (props.disabled) return
   // 更新Store中的当前高亮滑块
   currentHighSliderId = slider.id
   // 更新滑块激活状态
@@ -300,7 +301,7 @@ function stopDrag() {
 
 // 处理键盘事件
 function handleKeydown(event: KeyboardEvent) {
-  if (props.disabled) {
+  if (props.disabled || !(event.target instanceof Element) || !sliderTrackRef.value?.contains(event.target)) {
     return
   }
 
@@ -309,6 +310,20 @@ function handleKeydown(event: KeyboardEvent) {
     const findSliderFocus = props.sliderButtons[findSliderFocusIndex]
 
     switch (event.key) {
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        findSliderFocus.position -= props.step
+        break
+      case 'ArrowRight':
+      case 'ArrowUp':
+        findSliderFocus.position += props.step
+        break
+      case 'Home':
+        findSliderFocus.position = 0
+        break
+      case 'End':
+        findSliderFocus.position = 100
+        break
       case 'Delete':
       case 'Backspace':
         if (findSliderFocus.type === 'middle') {
@@ -420,12 +435,10 @@ function updateSliderButtons(val: any[]) {
 onMounted(() => {
   currentHighSliderId = props.sliderButtons.find(item => item.isActive)?.id
   eventBus.on('updateSliderButtons', updateSliderButtons)
-  window.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
   eventBus.off('updateSliderButtons', updateSliderButtons)
-  window.removeEventListener('keydown', handleKeydown)
   stopDrag()
 })
 
@@ -511,6 +524,15 @@ watch(
           <div
             :class="[style['slider-handle'], item.isActive ? style['slider-select-handle'] : '']"
             :style="handleStyle[index]"
+            role="slider"
+            :tabindex="disabled ? -1 : 0"
+            :aria-label="`渐变色标 ${index + 1}`"
+            :aria-valuemin="0"
+            :aria-valuemax="100"
+            :aria-valuenow="item.position"
+            :aria-disabled="disabled"
+            @focus="handleClick(item)"
+            @keydown="handleKeydown"
             @click.stop
             @mousedown.stop="(event) => startDrag(event, item)"
           />

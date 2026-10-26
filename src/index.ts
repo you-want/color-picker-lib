@@ -2,6 +2,7 @@
 export { default as ColorPicker } from './ColorPicker/index.vue'
 export { default as EyeDropper } from './EyeDropper/index.vue'
 export { default as SliderColorSetting } from './SliderColorSetting/index.vue'
+export type { ColorStop } from './shared/types'
 
 // 组合式 / 工具
 export { useRecentColors, resetRecentColors } from './composables/useRecentColors'

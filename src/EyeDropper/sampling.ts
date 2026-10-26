@@ -7,7 +7,10 @@ export function samplePoint(
   height: number,
 ) {
   if (
-    rect.width <= 0
+    ![clientX, clientY, rect.left, rect.top, rect.width, rect.height, width, height].every(Number.isFinite)
+    || width <= 0
+    || height <= 0
+    || rect.width <= 0
     || rect.height <= 0
     || clientX < rect.left
     || clientY < rect.top
