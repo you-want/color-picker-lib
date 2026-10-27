@@ -49,7 +49,8 @@ describe('画布取色', () => {
     expect(context.getImageData).toHaveBeenLastCalledWith(50, 20, 1, 1)
     expect(wrapper.emitted('confirm')).toEqual([['#123456']])
     expect(wrapper.emitted('close')).toHaveLength(1)
-    expect(context.strokeRect).toHaveBeenCalledWith(140, 140, 14, 14)
+    // 截图为页面的两倍尺寸，页面半径 10px 对应截图半径 20px。
+    expect(context.strokeRect).toHaveBeenCalledWith(280, 280, 14, 14)
   })
   it('未指定局部画布时可从网页属性栏等区域取色，并在圆内显示单行通道值', async () => {
     vi.spyOn(document.documentElement, 'getBoundingClientRect').mockReturnValue({

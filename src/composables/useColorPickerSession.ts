@@ -1,5 +1,5 @@
-import { onBeforeUnmount, ref } from 'vue'
-import { cancelPicking } from '../shared/ColorPickerState'
+import { onBeforeUnmount, ref, watch } from 'vue'
+import { cancelPicking, pickerState } from '../shared/ColorPickerState'
 
 export interface PickRequest {
   pickerId: string
@@ -13,6 +13,9 @@ export interface PickRequest {
  */
 export function useColorPickerSession() {
   const pending = ref<PickRequest | null>(null)
+  watch(() => pickerState.pickingPickerId, (id) => {
+    if (pending.value && id !== pending.value.pickerId) pending.value = null
+  }, { flush: 'sync' })
 
   function onPickRequest(req: PickRequest) {
     if (pending.value) cancelPicking(pending.value.pickerId)

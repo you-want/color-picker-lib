@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ColorPicker, EyeDropper, useColorPickerSession, type ColorStop } from '@you-want/color-picker-lib'
+import { ColorPicker, EyeDropper, horizontalGradientBorderStyle, useColorPickerSession, type ColorStop, type EffectiveColor } from '@you-want/color-picker-lib'
 
-// 宿主侧登录态：演示用固定 userId
+const userId = ref('demo-user')
 function getUserId(): string {
-  return 'demo-user'
+  return userId.value
 }
 
 const color = ref('#316BFF')
+const fillOpacity = ref(100)
+const effective = ref<EffectiveColor>({ sourceColor: color.value, fillOpacity: 100, color: color.value })
 const stops = ref<ColorStop[]>([])
 const canvasEl = ref<HTMLElement | null>(null)
 
@@ -35,33 +37,62 @@ function onCommit(c: string) {
   <div style="max-width: 720px; margin: 40px auto; font-family: system-ui; padding: 0 16px">
     <h1>取色器 & 调色板示例</h1>
     <p>
-      当前色值：<code>{{ color }}</code>
+      原始色值：<code data-testid="source-color">{{ color }}</code>
+    </p>
+    <p>
+      渲染色值：<code data-testid="effective-color">{{ effective.color }}</code>
     </p>
 
     <!-- 宿主画布：给 EyeDropper 截图的区域 -->
     <div
       ref="canvasEl"
-      style="position: relative; height: 320px; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; background: #0b1020; display: flex; align-items: center; justify-content: center"
+      data-testid="pick-canvas"
+      style="position: relative; height: 320px; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; background: #0b1020; display: flex; align-items: center; justify-content: center; gap: 24px"
     >
       <div
-        style="width: 240px; height: 140px; border-radius: 12px; background: linear-gradient(135deg, #ff6a00, #ee0979)"
+        style="width: 180px; height: 140px; border-radius: 12px; background: linear-gradient(135deg, #ff6a00, #ee0979)"
       />
+      <div
+        data-testid="gradient-border"
+        :data-render-color="effective.color"
+        :style="horizontalGradientBorderStyle(effective.color, 8)"
+        style="width: 280px; height: 160px; display: flex; align-items: center; justify-content: center; color: white; text-align: center; font-size: 13px"
+      >
+        矩形边框横向渐变<br>上下边框颜色一致
+      </div>
     </div>
 
     <div style="margin-top: 24px; display: flex; align-items: center; gap: 16px">
       <ColorPicker
         ref="pickerRef"
         v-model="color"
+        v-model:fill-opacity="fillOpacity"
         id="picker-1"
-        :fill-opacity="100"
         :slider-buttons="stops"
         :get-user-id="getUserId"
         storage-key="recenterlyUseColor:v2"
         @change-color-set="stops = $event"
         @pick-request="onPickRequest"
         @session-commit="onCommit"
+        @effective-change="effective = $event"
       />
       <span style="color: #666; font-size: 13px">点击调色板里的取色器按钮，画布区域会出现放大镜</span>
+    </div>
+    <div style="margin-top: 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+      <label for="demo-opacity">整体透明度 {{ fillOpacity }}%</label>
+      <input id="demo-opacity" v-model.number="fillOpacity" type="range" min="0" max="100">
+      <button
+        type="button"
+        @click="color = 'linear-gradient(90deg, rgba(255, 0, 0, 0.8) 0%, rgba(0, 255, 0, 0.6) 35%, rgba(0, 0, 255, 0.4) 100%)'"
+      >
+        加载三色渐变
+      </button>
+      <label for="demo-user">当前用户</label>
+      <select id="demo-user" v-model="userId">
+        <option value="demo-user">用户 A</option>
+        <option value="demo-other">用户 B</option>
+        <option value="">未登录</option>
+      </select>
     </div>
 
     <!-- 宿主控制的 EyeDropper：pick-request 时显示 -->

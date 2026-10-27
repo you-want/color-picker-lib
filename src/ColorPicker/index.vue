@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CaptureCanvasOptions } from '../EyeDropper/captureCanvas'
-import type { ColorStop as SliderButton } from '../shared/types'
+import type { ColorStop as SliderButton, ColorSnapshot, EffectiveColor } from '../shared/types'
 import { useRecentColors } from '../composables/useRecentColors'
 import {
   cancelPicking,
@@ -16,6 +16,7 @@ import {
   parseGradient,
   rgba,
   rgbToHex,
+  resolveColorWithOpacity,
   sketchPickerInputToColorString,
   toSketchPickerColorValue,
 } from '../color-utils/ColorUtil'
@@ -41,7 +42,7 @@ const props = withDefaults(
     id: string
     /** 实时色值（纯色 / linear-gradient CSS 字符串）。 */
     modelValue?: string
-    /** 填充透明度 0–100，默认 100。 */
+    /** 渐变整体透明度；纯色无显式 alpha 时作为透明度。支持 v-model:fillOpacity。 */
     fillOpacity?: number
     /** 预设色板，默认 DEFAULT_COLORS。 */
     presetColors?: string[]
@@ -89,10 +90,16 @@ const emit = defineEmits<{
   (e: 'changeColorSet', val: SliderButton[]): void
   (e: 'colorType', value: number): void
   (e: 'change', selectColor: string): void
+  /** 源颜色与透明度变化后的渲染值；初始状态也会通知，宿主用 color 渲染。 */
+  (e: 'effectiveChange', value: EffectiveColor): void
 }>()
 // 部分调用方在模板中传 uuid()，重渲染时仍需保持本次组件实例的取色身份。
 const pickerId = props.id
 const modelValue = defineModel<string>()
+const fillOpacityValue = defineModel<number>('fillOpacity', { default: 100 })
+const normalizedOpacity = computed(() => Number.isFinite(fillOpacityValue.value)
+  ? Math.max(0, Math.min(100, fillOpacityValue.value)) : 100)
+const effectiveColor = computed(() => resolveColorWithOpacity(modelValue.value || props.defaultColor, normalizedOpacity.value))
 
 // 最近颜色改为无 pinia 的组合式函数，userId 由宿主 getUserId 注入。
 const recent = useRecentColors({ getUserId: () => props.getUserId?.() || '', storageKey: props.storageKey })
@@ -111,17 +118,36 @@ const isReverseColor = ref(false)
 const sessionUserId = ref('')
 let sessionChanged = false
 let sessionColor = ''
+let sessionSnapshot: ColorSnapshot = { sourceColor: '', fillOpacity: 100 }
 let lastEmittedColor: string | null = null
 
 // 当前色固定占第一格，历史从第二格开始；允许当前色和刚提交的历史色相同。
 const useColors = computed(() =>
   [
-    modelValue.value || props.defaultColor,
-    ...recent.findUserIdColors(sessionUserId.value || recent.userId.value),
+    effectiveColor.value,
+    ...recent.userColors.value,
   ].slice(0, 16),
 )
 const sketchPickerValue = computed(() =>
-  toSketchPickerColorValue(selectColor.value, colorType.value === 1 ? 100 : props.fillOpacity),
+  toSketchPickerColorValue(selectColor.value, colorType.value === 1 ? 100 : normalizedOpacity.value),
+)
+watch(
+  () => [modelValue.value || props.defaultColor, normalizedOpacity.value] as const,
+  ([sourceColor, fillOpacity]) => emit('effectiveChange', { sourceColor, fillOpacity, color: effectiveColor.value }),
+  { immediate: true, flush: 'post' },
+)
+// 响应式登录态切换先结清旧用户会话，再关闭面板并刷新历史，避免新身份接收旧编辑。
+watch(
+  () => props.getUserId?.() || '',
+  (id) => {
+    if (popoverShow.value && id !== sessionUserId.value) {
+      finishSession()
+      popoverShow.value = false
+      if (pickerState.activePickerId === pickerId) setActivePickerId(null)
+    }
+    recent.setUserId(id)
+  },
+  { immediate: true, flush: 'sync' },
 )
 watch(sketchPickerValue, async (value) => {
   // vue-color 3.3.x 将所有 0° 色相都当作无色相，红色也会错误保留前一个色相。
@@ -157,7 +183,7 @@ function solidBase(raw?: string) {
 function halfHex() {
   let c
   try {
-    c = parseColorToRGBA(toSketchPickerColorValue(solidBase(modelValue.value), props.fillOpacity))
+    c = parseColorToRGBA(toSketchPickerColorValue(solidBase(modelValue.value), normalizedOpacity.value))
   } catch {
     c = parseColorToRGBA('#316BFF')
   }
@@ -201,7 +227,7 @@ watch(
     syncFromModel(value)
     if (popoverShow.value) {
       sessionChanged = false
-      sessionColor = value || props.defaultColor
+      recordSessionColor(value || props.defaultColor)
       if (colorType.value === 1) emit('changeColorSet', sliderButtonsValue.value)
     }
   },
@@ -225,16 +251,18 @@ watch(
   },
 )
 watch(
-  () => props.fillOpacity,
+  normalizedOpacity,
   () => {
     if (popoverShow.value) {
       sessionChanged = true
+      recordSessionColor()
       if (colorType.value === 0) {
         pickerKey.value++
         nextTick(expressColor)
       }
     }
   },
+  { flush: 'sync' },
 )
 watch(
   popoverShow,
@@ -243,7 +271,7 @@ watch(
       recent.refreshUserId()
       sessionUserId.value = recent.userId.value
       sessionChanged = false
-      sessionColor = modelValue.value || props.defaultColor
+      recordSessionColor()
       syncFromModel()
       if (colorType.value === 1) {
         emit('changeColorSet', sliderButtonsValue.value)
@@ -261,18 +289,22 @@ watch(
 )
 function finishSession() {
   if (sessionChanged) {
-    if (sessionUserId.value) recent.changeUseColor(sessionColor, sessionUserId.value)
+    if (sessionUserId.value) recent.changeUseColor(sessionColor, sessionUserId.value, sessionSnapshot)
     emit('sessionCommit', sessionColor)
   }
   sessionChanged = false
   cancelPicking(pickerId)
+}
+function recordSessionColor(sourceColor = modelValue.value || props.defaultColor) {
+  sessionSnapshot = { sourceColor, fillOpacity: normalizedOpacity.value }
+  sessionColor = resolveColorWithOpacity(sourceColor, normalizedOpacity.value)
 }
 function applyColor(value: string) {
   if (!value) {
     return
   }
   sessionChanged ||= popoverShow.value && value !== modelValue.value
-  sessionColor = value
+  recordSessionColor(value)
   lastEmittedColor = value
   modelValue.value = value
   emit('change', value)
@@ -313,17 +345,25 @@ function updateValue(colors: Parameters<typeof sketchPickerInputToColorString>[0
     applyColor(value)
   }
 }
-function chooseRecentColor(value: string) {
-  if (parseGradient(value)) {
+function chooseRecentColor(value: string, index: number) {
+  if (index === 0) return
+  const snapshot = recent.findColorSnapshot(value)
+  if (parseGradient(snapshot.sourceColor)) {
     if (!props.isNeedGradient) {
       return
     }
-    applyColor(value)
-    syncFromModel(value)
+    fillOpacityValue.value = snapshot.fillOpacity
+    applyColor(snapshot.sourceColor)
+    syncFromModel(snapshot.sourceColor)
     emit('changeColorSet', sliderButtonsValue.value)
     nextTick(() => eventBus.emit('changeSliderButtons', sliderButtonsValue.value))
   } else {
-    updateValue(value)
+    if (colorType.value === 1) updateValue(value)
+    else {
+      fillOpacityValue.value = snapshot.fillOpacity
+      applyColor(snapshot.sourceColor)
+      syncFromModel(snapshot.sourceColor)
+    }
   }
 }
 function colorTypeChange(value: number | string | boolean | undefined) {
@@ -613,7 +653,7 @@ onBeforeUnmount(() => {
   eventBus.off('line-slider-ready', lineSliderReadyHandler)
 })
 
-defineExpose({ applyPickedColor })
+defineExpose({ applyPickedColor, effectiveColor })
 </script>
 
 <template>
@@ -760,6 +800,19 @@ defineExpose({ applyPickedColor })
               </button>
             </el-tooltip>
           </div>
+          <label v-if="colorType === 1" :class="style['gradient-opacity']">
+            <span>整体透明度</span>
+            <input
+              v-model.number="fillOpacityValue"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              aria-label="渐变整体透明度"
+              @keydown.stop
+            >
+            <output>{{ normalizedOpacity }}%</output>
+          </label>
           <div
             ref="sketchPickerRootRef"
             :class="style['picker-body']"
@@ -816,7 +869,7 @@ defineExpose({ applyPickedColor })
               :aria-current="index === 0 ? 'true' : undefined"
               :title="value"
               :disabled="!isNeedGradient && value.includes('linear-gradient')"
-              @click="chooseRecentColor(value)"
+              @click="chooseRecentColor(value, index)"
             >
               <span :style="{ background: value }" />
             </button>
@@ -859,9 +912,9 @@ defineExpose({ applyPickedColor })
                 :style="{
                   background:
                     modelValue && !String(modelValue).includes('linear-gradient')
-                      ? modelValue
+                      ? effectiveColor
                       : defaultColor || '#1A76F5',
-                  opacity: disabled ? 0 : fillOpacity / 100,
+                  opacity: disabled ? 0 : 1,
                 }"
               />
             </button>
@@ -881,8 +934,8 @@ defineExpose({ applyPickedColor })
               <span
                 class="trigger-color"
                 :style="{
-                  background: modelValue,
-                  opacity: disabled ? 0 : fillOpacity / 100,
+                  background: effectiveColor,
+                  opacity: disabled ? 0 : 1,
                 }"
               />
             </button>

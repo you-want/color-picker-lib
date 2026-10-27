@@ -1,9 +1,11 @@
-import { gradientAngleToDegrees, parseColorToRGBA, parseGradient } from '../color-utils/ColorUtil'
+import { gradientAngleToDegrees, parseColorToRGBA, parseGradient, resolveColorWithOpacity } from '../color-utils/ColorUtil'
+import type { ColorSnapshot } from '../shared/types'
 import { computed, reactive, ref, type Ref } from 'vue'
 
 interface UserColors {
   userId: string
   colors: string[]
+  snapshots?: Record<string, ColorSnapshot>
 }
 // 第 1 格是实时颜色，剩下 15 格是已提交的历史。
 const HISTORY_LIMIT = 15
@@ -55,6 +57,22 @@ function uniqueColors(values: unknown[]): string[] {
   }).slice(0, HISTORY_LIMIT)
 }
 
+function readSnapshots(value: unknown, colors: string[]): Record<string, ColorSnapshot> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const source = value as Record<string, Partial<ColorSnapshot> | null>
+  return Object.fromEntries(colors.flatMap((color) => {
+    const key = colorKey(color)
+    const snapshot = source[key]
+    if (!snapshot || typeof snapshot.sourceColor !== 'string' || !snapshot.sourceColor.trim()
+      || typeof snapshot.fillOpacity !== 'number' || !Number.isFinite(snapshot.fillOpacity)
+      || snapshot.fillOpacity < 0 || snapshot.fillOpacity > 100) return []
+    try {
+      if (colorKey(resolveColorWithOpacity(snapshot.sourceColor, snapshot.fillOpacity)) !== key) return []
+      return [[key, { sourceColor: snapshot.sourceColor, fillOpacity: snapshot.fillOpacity }]]
+    } catch { return [] }
+  }))
+}
+
 function readColors(storageKey: string, legacyKey: string): UserColors[] {
   try {
     const current = localStorage.getItem(storageKey)
@@ -64,11 +82,11 @@ function readColors(storageKey: string, legacyKey: string): UserColors[] {
     }
     return parsed
       .filter(item => item && ['string', 'number'].includes(typeof item.userId) && Array.isArray(item.colors))
-      .map(item => ({
-        userId: String(item.userId),
+      .map((item) => {
         // 旧 key 是倒序写入的（最新在前），迁移到新 key 时反转回"最新在前"。
-        colors: uniqueColors(current ? item.colors : [...item.colors].reverse()),
-      }))
+        const colors = uniqueColors(current ? item.colors : [...item.colors].reverse())
+        return { userId: String(item.userId), colors, snapshots: readSnapshots(item.snapshots, colors) }
+      })
   } catch {
     return []
   }
@@ -80,12 +98,13 @@ export interface RecentColorsApi {
   /** 当前登录用户 id，未登录为空串。 */
   userId: Ref<string>
   /** 提交一次颜色到历史（退出调色板时调用）。 */
-  changeUseColor: (value: string, id?: string) => void
+  changeUseColor: (value: string, id?: string, snapshot?: ColorSnapshot) => void
   /** 手动设置 userId。 */
   setUserId: (value: string) => void
   /** 依据 getUserId 重新解析当前用户。 */
   refreshUserId: () => void
   findUserIdColors: (id: string) => string[]
+  findColorSnapshot: (value: string, id?: string) => ColorSnapshot
 }
 
 export interface UseRecentColorsOptions {
@@ -146,7 +165,7 @@ export function useRecentColors(options: UseRecentColorsOptions = {}): RecentCol
     }
   }
 
-  function changeUseColor(value: string, id?: string) {
+  function changeUseColor(value: string, id?: string, snapshot?: ColorSnapshot) {
     const targetId = id ?? userId.value
     if (!targetId || !value?.trim()) {
       return
@@ -155,6 +174,11 @@ export function useRecentColors(options: UseRecentColorsOptions = {}): RecentCol
     const entry = sharedState.find(item => item.userId === targetId)!
     // 重新使用已有颜色时移到最前，不重复占用历史位置。
     entry.colors = uniqueColors([value, ...entry.colors])
+    const snapshots = { ...entry.snapshots }
+    const key = colorKey(value)
+    delete snapshots[key]
+    if (snapshot) snapshots[key] = snapshot
+    entry.snapshots = readSnapshots(snapshots, entry.colors)
     persist()
   }
 
@@ -172,6 +196,11 @@ export function useRecentColors(options: UseRecentColorsOptions = {}): RecentCol
     return sharedState.find(item => item.userId === id)?.colors || []
   }
 
+  function findColorSnapshot(value: string, id = userId.value): ColorSnapshot {
+    const snapshot = sharedState.find(item => item.userId === id)?.snapshots?.[colorKey(value)]
+    return snapshot ? { ...snapshot } : { sourceColor: value, fillOpacity: 100 }
+  }
+
   return {
     userColors,
     userId,
@@ -179,6 +208,7 @@ export function useRecentColors(options: UseRecentColorsOptions = {}): RecentCol
     setUserId,
     refreshUserId,
     findUserIdColors,
+    findColorSnapshot,
   }
 }
 

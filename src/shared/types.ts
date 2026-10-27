@@ -6,3 +6,13 @@ export interface ColorStop {
   id: string
   color: string
 }
+
+/** 可恢复的颜色编辑数据；color 为乘入整体透明度后的渲染值。 */
+export interface ColorSnapshot {
+  sourceColor: string
+  fillOpacity: number
+}
+
+export interface EffectiveColor extends ColorSnapshot {
+  color: string
+}

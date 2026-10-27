@@ -1,6 +1,6 @@
 {
   "name": "@you-want/color-picker-lib",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "packageManager": "pnpm@10.32.1",
   "type": "module",
   "description": "取色器(EyeDropper)与调色板(ColorPicker)公共组件库，从设计器主工程抽取并完成解耦，含宿主取色链路与示例应用",

@@ -19,3 +19,13 @@ pnpm test --reporter=json --outputFile=/tmp/color-picker-test-results.json
 ```
 
 修复记录和覆盖边界见 [测试报告](../../docs/TEST_REPORT.md)。
+
+需求 3.10 新增 `requirements.test.ts`（整体透明度、历史快照、用户切换及 pending 清理）和 `magnifier.test.ts`（页面半径 10 CSS px、逐截图像素网格）。jsdom 结果不能替代像素验收。
+
+真实浏览器脚本：先 `pnpm build` 和启动 example，再连接 tt-bridge 扩展，执行：
+
+```bash
+node scripts/verify-requirements-browser.mjs http://127.0.0.1:5186/ /tmp/color-picker-requirements-browser.json
+```
+
+脚本使用新标签中的真实组件、snapdom 和 Canvas，验证边框像素与透明度往返、历史选择/布局、用户切换、放大镜中心/半径和取色取消。测试后恢复原历史数据并关闭测试标签。仅支持本地示例，机器可读证据保存于第三个参数指定的位置。

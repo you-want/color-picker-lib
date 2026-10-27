@@ -547,6 +547,15 @@ export function gradientWithOpacity(color: string, opacityPercent = 100): string
   return `linear-gradient(${gradient.angle}, ${stops.join(', ')})`
 }
 
+/** 与调色板一致的渲染颜色。渐变整体透明度不回写源色标，纯色保留显式 alpha 优先规则。 */
+export function resolveColorWithOpacity(color: string, opacityPercent = 100): string {
+  const opacity = Number.isFinite(opacityPercent) ? Math.max(0, Math.min(100, opacityPercent)) : 100
+  if (opacity === 100) return color
+  return parseGradient(color)
+    ? gradientWithOpacity(color, opacity)
+    : toSketchPickerColorValue(color, opacity)
+}
+
 /** 新增色标沿用当前位置的渐变颜色，使用预乘 alpha 插值，避免插入白色造成跳变。 */
 export function interpolateGradientColor(stops: { position: number, color: string }[], position: number): string {
   const sorted = [...stops].sort((a, b) => a.position - b.position)
