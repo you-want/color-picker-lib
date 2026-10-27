@@ -2,7 +2,7 @@
 
 ## 当前验收：2026-10-27，需求 3.10（0.2.0）
 
-依据：[V2.3 工业组态产品体验优化，3.10 取色器&调色板](https://ones.cisdigital.cn/wiki/#/team/SKG3mSQb/share/6DnmNRj8/page/CwzHmSXD)。发布目标为 0.2.0。当前记录本地验收；远端提交、npm 发布和部署验证以本节后续发布凭证为准，0.1.1 不包含本轮修改。
+依据：[V2.3 工业组态产品体验优化，3.10 取色器&调色板](https://ones.cisdigital.cn/wiki/#/team/SKG3mSQb/share/6DnmNRj8/page/CwzHmSXD)。0.2.0 已提交远端、发布 npm 并部署示例；各环节凭证见下方，0.1.1 不包含本轮修改。
 
 - **`pnpm verify` 完整通过：15 个文件、188 个用例，无跳过或预期失败。** 包括新增 10 项透明度/历史/用户切换回归及 4 项放大镜比例回归，全部原 174 项断言继续通过。库与示例类型检查、生产构建、真实 tarball 宿主消费通过；tarball 验证复用本机依赖，本次未重新进行空 store 安装。
 - **tt-bridge 真实 Chrome：6/6 组通过**，证据见 [requirements-browser-acceptance.json](./requirements-browser-acceptance.json)。消费当前 dist，无库源码别名，不替换组件、snapdom、Canvas 或像素；通过 DOM 点击与合成鼠标/键盘事件操作，不等同于操作系统可信输入或屏幕阅读器验收。
@@ -29,6 +29,16 @@ node scripts/verify-requirements-browser.mjs http://127.0.0.1:5186/ /tmp/color-p
 脚本只接受本地示例 URL，新建测试标签，结束后恢复该 origin 原有历史数据并关闭测试标签；扩展未连接时最多等待五分钟。浏览器证据环境为 macOS、Chrome 155、1730×952、DPR=2。DPR=1/1.5 与非等比截图比例仅有自动化边界回归，Safari/Firefox、触屏、屏幕阅读器及最低依赖版本矩阵本轮未验证。
 
 **宿主边界：** 矩形辅助函数和示例已经验收，原工业组态主工程未在本仓库修改或上线；主工程需要消费有效颜色，并接入该横向边框函数或等价方案后再做实际页面验收。辅助函数不处理圆角、SVG 或 Canvas 宿主边框。非响应式登录态由宿主在切换前关闭会话，重新打开时会读取新用户。
+
+### 0.2.0 发布与部署凭证
+
+- [npm 0.2.0](https://www.npmjs.com/package/@you-want/color-picker-lib/v/0.2.0) 已发布，registry `latest` 为 0.2.0。发布的是经过验收的构建 tarball：23 文件、35,155 bytes，SHA-1 `f397b1ba733081c162d863c0f2eb58085fdb912e`，registry 与本地一致。
+- [源码标签 v0.2.0](https://github.com/you-want/color-picker-lib/tree/v0.2.0) 指向 `6455afad518030fdff843ebce36b8348142c9bde`，已推送 main 与标签。[GitHub Actions](https://github.com/you-want/color-picker-lib/actions/runs/40468639324) 的 verify、deploy 均成功。
+- [线上示例](https://you-want.github.io/color-picker-lib/) 的 `version.json` 验证为 0.2.0 与上述 commit；线上 JS/CSS 与本地验收构建逐字节相同。后续 main 文档提交仍会触发部署，commit 可随之更新；release tag 保持不变。
+- registry 独立消费方使用空 pnpm store 安装发布包、Vue 3.5.44、Element Plus 2.14.7 及完整构建工具链，下载 88 个依赖、reused 0。安装使用 `--ignore-scripts`，随后类型检查、生产构建和最终 CSS 检查均通过，没有源码别名或本地依赖链接。
+- 发布后独立无头 Chrome 156（1440×1000、DPR=2）访问线上产物，确认整体透明度 100%→50%→0%→100% 保留源色标并恢复；实际 snapdom/Canvas 取色为 #0B1020，正确写回激活色标，其余色标保留，pageerror 为空。此冒烟检查不替代上方本地 6 组需求验收，也不扩展 Safari/Firefox 等覆盖声明。
+
+结构化发布证据见 [release-0.2.0-acceptance.json](./release-0.2.0-acceptance.json)。发布前以 `VITE_BASE=/color-picker-lib/ pnpm verify` 对 0.2.0 再次完整验收通过，日志保存于 `/private/tmp/color-picker-release-0.2.0-verify.log`；独立安装、构建及线上截图在 `/private/tmp/color-picker-release-0.2.0/`。
 
 ## 2026-10-26 初次修复及已发布 0.1.1 的历史记录
 
