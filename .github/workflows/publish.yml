@@ -1,0 +1,94 @@
+name: Publish to NPM
+
+# 手动触发：在 GitHub Actions 页面输入新版本号即可发布。
+# 流程：校验版本未占用 → 更新 package.json → pnpm verify → npm publish →
+#       提交版本号回 main 并打 tag（本地 git pull 即同步版本号）。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '新版本号（semver，例如 0.2.1）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write  # npm Trusted Publishing (OIDC) 必需
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: npm  # 必须与 npm Trusted Publisher 配置的 Environment name 一致
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            example/pnpm-lock.yaml
+          registry-url: https://registry.npmjs.org/
+
+      - name: 校验版本号
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="$INPUT_VERSION"
+          # semver 校验：MAJOR.MINOR.PATCH，可选预发布后缀
+          if ! echo "$VERSION" | grep -qE '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+            echo "::error::版本号格式不合法：$VERSION（需符合 semver，如 0.2.1）"
+            exit 1
+          fi
+          # 确认该版本未在 npm 上发布
+          PUBLISHED_VERSIONS=$(npm view @you-want/color-picker-lib versions --json 2>/dev/null || echo "[]")
+          if echo "$PUBLISHED_VERSIONS" | grep -q "\"$VERSION\""; then
+            echo "::error::版本 $VERSION 已在 npm 上发布，不能覆盖"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: 安装依赖
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir example install --frozen-lockfile
+
+      - name: 更新 package.json 版本号
+        run: |
+          node --input-type=module -e "
+            import fs from 'node:fs';
+            const pkg = JSON.parse(fs.readFileSync('package.json'));
+            pkg.version = process.env.VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: 全量验收（测试 + 类型 + 示例构建 + tarball 消费）
+        run: pnpm verify
+        env:
+          VITE_BASE: /color-picker-lib/
+
+      - name: 发布到 npm
+        run: npm publish --access public
+        # 使用 npm Trusted Publishing (OIDC)，无需 NPM_TOKEN；
+        # 通过 id-token: write 权限自动获取 OIDC token 完成认证。
+
+      - name: 提交版本号回 main 并打 tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: release v${VERSION}"
+          git push origin main
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
