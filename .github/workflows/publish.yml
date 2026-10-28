@@ -3,6 +3,7 @@ name: Publish to NPM
 # 手动触发：在 GitHub Actions 页面输入新版本号即可发布。
 # 流程：校验版本未占用 → 更新 package.json → pnpm verify → npm publish →
 #       提交版本号回 main 并打 tag（本地 git pull 即同步版本号）。
+# 认证使用 npm Trusted Publishing (OIDC)，无需 NPM_TOKEN。
 on:
   workflow_dispatch:
     inputs:
@@ -24,13 +25,18 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: npm  # 必须与 npm Trusted Publisher 配置的 Environment name 一致
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}  # 未配置时为空，npm 11 自动 fallback 到 OIDC
+      NPM_CONFIG_PROVENANCE: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
 
       - uses: actions/setup-node@v4
         with:
@@ -41,17 +47,18 @@ jobs:
             example/pnpm-lock.yaml
           registry-url: https://registry.npmjs.org/
 
+      - name: 升级 npm 到 v11（OIDC Trusted Publishing 支持）
+        run: npm install --global npm@^11.5.1
+
       - name: 校验版本号
         env:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
           VERSION="$INPUT_VERSION"
-          # semver 校验：MAJOR.MINOR.PATCH，可选预发布后缀
           if ! echo "$VERSION" | grep -qE '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
             echo "::error::版本号格式不合法：$VERSION（需符合 semver，如 0.2.1）"
             exit 1
           fi
-          # 确认该版本未在 npm 上发布
           PUBLISHED_VERSIONS=$(npm view @you-want/color-picker-lib versions --json 2>/dev/null || echo "[]")
           if echo "$PUBLISHED_VERSIONS" | grep -q "\"$VERSION\""; then
             echo "::error::版本 $VERSION 已在 npm 上发布，不能覆盖"
@@ -78,29 +85,9 @@ jobs:
         env:
           VITE_BASE: /color-picker-lib/
 
-      - name: 调试 OIDC 环境
-        run: |
-          echo "=== npm version ==="
-          npm --version
-          echo "=== OIDC env vars ==="
-          echo "ACTIONS_ID_TOKEN_REQUEST_URL=${ACTIONS_ID_TOKEN_REQUEST_URL:-NOT_SET}"
-          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN present: $([ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ] && echo yes || echo no)"
-          echo "=== ~/.npmrc ==="
-          cat ~/.npmrc 2>/dev/null || echo "(no .npmrc)"
-          echo "=== 获取并解码 OIDC token claims ==="
-          OIDC_TOKEN=$(curl -sLS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=registry.npmjs.org" | jq -r '.value')
-          echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq '{repository, workflow, environment, ref, sub}' || echo "(decode failed)"
-
       - name: 发布到 npm
-        run: |
-          # 覆盖 ~/.npmrc，只保留 registry，清除 setup-node 写入的空 _authToken
-          # 无 _authToken 时 npm 会自动检测 OIDC env 并完成 Trusted Publishing 认证
-          cat > ~/.npmrc << 'NPMRC'
-          registry=https://registry.npmjs.org/
-          NPMRC
-          npm publish --access public
-        # 使用 npm Trusted Publishing (OIDC)，无需 NPM_TOKEN；
-        # 通过 id-token: write 权限自动获取 OIDC token 完成认证。
+        run: npm publish --access public
+        # npm 11 + 空 NODE_AUTH_TOKEN → 自动使用 OIDC Trusted Publishing 认证
 
       - name: 提交版本号回 main 并打 tag
         run: |
