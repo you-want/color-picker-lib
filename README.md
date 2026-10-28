@@ -2,6 +2,10 @@
 
 Vue 3 调色板、线性渐变编辑器与画布取色浮层。依赖 Vue `^3.5.0`、Element Plus `>=2.6.0`，无需宿主 store、JWT 或 Pinia。
 
+[![npm version](https://img.shields.io/npm/v/@you-want/color-picker-lib.svg)](https://www.npmjs.com/package/@you-want/color-picker-lib)
+[![npm weekly downloads](https://img.shields.io/npm/dw/@you-want/color-picker-lib.svg)](https://www.npmjs.com/package/@you-want/color-picker-lib)
+[![license](https://img.shields.io/npm/l/@you-want/color-picker-lib.svg)](https://github.com/you-want/color-picker-lib/blob/main/LICENSE)
+
 [在线示例](https://you-want.github.io/color-picker-lib/) · [更新记录](CHANGELOG.md)
 
 ## 安装与样式
@@ -155,6 +159,16 @@ node scripts/verify-requirements-browser.mjs http://127.0.0.1:5186/ /tmp/color-p
 ```
 
 example 使用 `link:..` 消费本地构建产物，不再引用已发布旧版本。`test:package` 消费实际 npm tarball，复用本机已安装依赖；它不验证空缓存联网安装。`test:audit` 保留为 `test` 的兼容别名，历史审计用例已全部纳入默认测试。详细结果与环境限制见 [测试报告](docs/TEST_REPORT.md)。
+
+### 通过 GitHub Actions 发布（推荐）
+
+在 GitHub 仓库的 **Actions → Publish to NPM → Run workflow** 中输入新版本号（semver，如 `0.2.1`）即可。流程会自动：校验版本未占用 → 更新 `package.json` → 运行 `pnpm verify` → 发布到 npm → 提交版本号回 main 并打 tag。
+
+本地执行 `git pull` 即可同步更新后的版本号。
+
+认证方式采用 npm **Trusted Publishing（OIDC）**，无需配置 `NPM_TOKEN`。需在 npm 包设置页 → Publishing Access → Add a GitHub Actions publisher，填入仓库 `you-want/color-picker-lib`、workflow `publish.yml`、environment `npm`。首次发布后该配置即生效。
+
+### 本地手动发布
 
 ```bash
 npm pack       # prepack 自动构建；产出 tgz，不执行发布
