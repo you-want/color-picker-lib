@@ -79,7 +79,10 @@ jobs:
           VITE_BASE: /color-picker-lib/
 
       - name: 发布到 npm
-        run: npm publish --access public
+        run: |
+          # setup-node 会写入空的 _authToken，需清除后让 npm 使用 OIDC
+          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+          npm publish --access public --auth-type=oidc
         # 使用 npm Trusted Publishing (OIDC)，无需 NPM_TOKEN；
         # 通过 id-token: write 权限自动获取 OIDC token 完成认证。
 
