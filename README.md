@@ -8,6 +8,8 @@ Vue 3 调色板、线性渐变编辑器与画布取色浮层。依赖 Vue `^3.5.
 
 [在线示例](https://you-want.github.io/color-picker-lib/) · [更新记录](CHANGELOG.md)
 
+<img width="1174" height="753" alt="image" src="https://github.com/user-attachments/assets/f906d4ec-b534-4c69-86f7-79160ec4e0e2" />
+
 ## 安装与样式
 
 ```bash
