@@ -94,7 +94,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json
-          git commit -m "chore: release v${VERSION}"
-          git push origin main
-          git tag "v${VERSION}"
-          git push origin "v${VERSION}"
+          # package.json 可能已由本地提交到目标版本；无可提交内容时跳过，避免 git commit 退出码 1
+          if git diff --cached --quiet; then
+            echo "package.json 已是 v${VERSION}，跳过版本提交"
+          else
+            git commit -m "chore: release v${VERSION}"
+            git push origin main
+          fi
+          # tag 已存在时跳过创建，只保证远端有 tag
+          if git ls-remote --tags origin "refs/tags/v${VERSION}" | grep -q .; then
+            echo "远端已存在 tag v${VERSION}，跳过"
+          else
+            git tag "v${VERSION}"
+            git push origin "refs/tags/v${VERSION}"
+          fi
