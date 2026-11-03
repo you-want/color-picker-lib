@@ -77,7 +77,9 @@ describe('真实 Element Plus / vue-color 集成（jsdom，无组件替身）', 
     render(); await open()
     expect(palettes()).toHaveLength(1)
     expect(document.querySelector('.vc-sketch-picker')).not.toBeNull()
-    expect(document.querySelector('[aria-label="画布取色"]')).not.toBeNull()
+    const eyedropper = document.querySelector<HTMLButtonElement>('[aria-label="画布取色"]')!
+    expect(eyedropper.querySelector('svg')?.getAttribute('width')).toBe('16')
+    expect(eyedropper.querySelector('svg')?.getAttribute('height')).toBe('16')
   })
   it.each(['disabled', 'settingDisabled'])('%s 阻止展开', async prop => {
     render({ [prop]: true }); await open()

@@ -20,7 +20,7 @@ pnpm test --reporter=json --outputFile=/tmp/color-picker-test-results.json
 
 修复记录和覆盖边界见 [测试报告](../../docs/TEST_REPORT.md)。
 
-需求 3.10 新增 `requirements.test.ts`（整体透明度、历史快照、用户切换及 pending 清理）和 `magnifier.test.ts`（页面半径 10 CSS px、逐截图像素网格）。jsdom 结果不能替代像素验收。
+需求 3.10 新增 `requirements.test.ts`（整体透明度 API、历史快照、用户切换及 pending 清理）和 `magnifier.test.ts`（页面半径 10 CSS px、固定 13×13 显示网格）。jsdom 结果不能替代像素验收。
 
 真实浏览器脚本：先 `pnpm build` 和启动 example，再连接 tt-bridge 扩展，执行：
 

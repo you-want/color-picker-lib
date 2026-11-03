@@ -49,8 +49,13 @@ describe('画布取色', () => {
     expect(context.getImageData).toHaveBeenLastCalledWith(50, 20, 1, 1)
     expect(wrapper.emitted('confirm')).toEqual([['#123456']])
     expect(wrapper.emitted('close')).toHaveLength(1)
-    // 截图为页面的两倍尺寸，页面半径 10px 对应截图半径 20px。
-    expect(context.strokeRect).toHaveBeenCalledWith(280, 280, 14, 14)
+    // 采样范围仍覆盖 10 CSS px；显示网格固定为 13×13 格。
+    expect(context.drawImage).toHaveBeenLastCalledWith(expect.any(HTMLCanvasElement), 30, 0, 41, 41, 0, 0, 195, 195)
+    expect(context.strokeRect).toHaveBeenCalledWith(90, 90, 15, 15)
+    const lens = document.querySelector('[class*=mag-canvas]') as HTMLCanvasElement
+    expect(lens.width).toBe(195)
+    expect(lens.dataset.displayRadiusX).toBe('6')
+    expect(lens.dataset.displayRadiusY).toBe('6')
   })
   it('未指定局部画布时可从网页属性栏等区域取色，并在圆内显示单行通道值', async () => {
     vi.spyOn(document.documentElement, 'getBoundingClientRect').mockReturnValue({
@@ -67,6 +72,9 @@ height: 600,
     expect(wrapper.emitted('confirm')).toEqual([['#123456']])
     await flushPromises()
     expect(overlay().textContent).toContain('R:18 G:52 B:86 #123456')
+    const lens = document.querySelector('[class*=mag-canvas]') as HTMLCanvasElement
+    expect(lens.width).toBe(195)
+    expect(context.strokeRect).toHaveBeenLastCalledWith(90, 90, 15, 15)
   })
   it('esc 在截图未完成时也能取消，异步截图不会重新激活', async () => {
     let resolve!: (value: HTMLCanvasElement) => void

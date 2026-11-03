@@ -233,6 +233,11 @@ function startDrag(event: MouseEvent, slider: any) {
   handleClick(slider) // 激活当前拖拽的滑块
 
   event.preventDefault()
+  // preventDefault 会吞掉 click 触发的 focus，手动补上，保证 Delete/Backspace 键盘删除可用。
+  const target = event.currentTarget as HTMLElement | null
+  if (target?.focus) {
+    target.focus()
+  }
   isDragging.value = true
 
   // 添加事件监听
@@ -297,6 +302,20 @@ function stopDrag() {
   // document.removeEventListener('touchmove', handleDrag)
   document.removeEventListener('mouseup', stopDrag)
   // document.removeEventListener('touchend', stopDrag)
+}
+
+// 右键删除中间色标（起点/终点固定不可删）。
+function handleContextMenu(event: MouseEvent, slider: any) {
+  event.preventDefault()
+  event.stopPropagation()
+  if (props.disabled || slider.type !== 'middle') {
+    return
+  }
+  const sliderIndex = props.sliderButtons.findIndex((item: any) => item.id === slider.id)
+  if (sliderIndex !== -1) {
+    emit('updateSliderButtons', sliderIndex)
+    currentHighSliderId = ''
+  }
 }
 
 // 处理键盘事件
@@ -534,6 +553,7 @@ watch(
             @focus="handleClick(item)"
             @keydown="handleKeydown"
             @click.stop
+            @contextmenu="(event) => handleContextMenu(event, item)"
             @mousedown.stop="(event) => startDrag(event, item)"
           />
         </el-tooltip>

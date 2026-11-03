@@ -198,32 +198,13 @@
   padding: 12px 12px 4px;
 }
 
-.gradient-opacity {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px 0;
-
-  input {
-    flex: 1;
-    min-width: 0;
-    margin: 0;
-    accent-color: var(--color-picker-primary, #316bff);
-  }
-
-  output {
-    width: 34px;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
-}
-
 .eyedropper-button {
   position: absolute;
   left: 12px;
   top: 166px;
-  width: 14px;
-  height: 14px;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .palette-tools {
@@ -346,7 +327,7 @@
         .vc-input-input {
           width: 73px !important;
           padding: 0 4px 0 14px !important;
-          font-size: 10px;
+          font-size: 12px;
         }
       }
 

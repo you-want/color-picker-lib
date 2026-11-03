@@ -58,7 +58,7 @@ const stops = ref<ColorStop[]>([])
 | --- | --- |
 | `id` | 必填，稳定且唯一的实例 ID |
 | `modelValue` | 原始 CSS 纯色或 `linear-gradient(...)`；保留各色标自身 alpha |
-| `fillOpacity` | 100；渐变整体透明度，范围 0–100；支持 `v-model:fill-opacity`，无显式 alpha 的纯色也使用此值 |
+| `fillOpacity` | 100；整体透明度，范围 0–100；支持 `v-model:fill-opacity`，由宿主控制，无显式 alpha 的纯色也使用此值 |
 | `showEyeDropper` | true；宿主负责接收取色请求并挂载 EyeDropper |
 | `getUserId` | 可选 `() => string`；未登录返回空串 |
 | `storageKey` | `recenterlyUseColor:v2`；不同 key 的历史独立，相同 key 按用户共享历史 |
@@ -129,7 +129,7 @@ const rendered = ref(source.value)
 
 事件为 `confirm(hex)`、`close`、`nativeUnsupported`。Escape、右键和退出按钮可取消；截图失败时显示错误与退出入口。
 
-放大镜覆盖笔尖周围半径 10 CSS px 的页面范围，每格对应一个截图像素；DPR=1 时为 21×21 格，DPR=2 时为 41×41 格。坐标与范围按截图和页面的实际比例计算，不重复叠加滚动量或设备像素比。
+调色板不另加整体透明度滑块；宿主仍可通过 `v-model:fill-opacity` 控制透明度。放大镜固定为 200×200 CSS px，采样范围覆盖笔尖周围 10 CSS px，并以固定 13×13 格显示，避免 DPR 改变时格子尺寸变化；中心高亮格对应实际采样点。
 
 snapdom 的实时样式恢复、滚动容器、伪元素与排除占位修复位于 `EyeDropper/captureCanvas.ts`。默认排除 `[data-eyedropper-exclude]`；浮层在截图副本中移除，不要把浮层本身加入传给 snapdom 的 exclude 列表。
 

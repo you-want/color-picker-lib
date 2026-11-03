@@ -78,20 +78,22 @@ try {
     Array.from(document.querySelectorAll('button')).find(e => e.textContent.includes('加载三色渐变')).click()
     await flush(); await ensureOpen()
     a.originalGradient = source()
-    await input('input[aria-label="渐变整体透明度"]', 50)
+    expect(document.querySelector('input[aria-label="渐变整体透明度"]') === null, 'Palette must not add a second global opacity control')
+    expect(q('button[aria-label="画布取色"]')?.querySelector('svg')?.getAttribute('width') === '16', 'Palette eyedropper icon must be 16px')
+    await input('#demo-opacity', 50)
     expect(JSON.stringify(alphas(effective())) === '[0.4,0.3,0.2]', 'Effective alpha must include global opacity')
     expect(source() === a.originalGradient, 'Global opacity mutated source')
     expect(history().length === 0, 'History written before closing')
     const half = effective()
     await ensureClosed()
     expect(history()[0].colors[0] === half, 'History must contain effective color')
-    await ensureOpen(); await input('input[aria-label="渐变整体透明度"]', 0); await ensureClosed()
+    await ensureOpen(); await input('#demo-opacity', 0); await ensureClosed()
     const zero = effective()
     await input('#demo-opacity', 100); await ensureOpen()
     q('button[aria-label^="历史颜色"]').click(); await flush()
     expect(source() === a.originalGradient && q('#demo-opacity').value === '0', 'History did not restore source and opacity')
     expect(effective() === zero, 'History opacity applied twice')
-    await input('input[aria-label="渐变整体透明度"]', 100)
+    await input('#demo-opacity', 100)
     expect(JSON.stringify(alphas(effective())) === '[0.8,0.6,0.4]', 'Opaque recovery lost original alpha')
     const handles = [...document.querySelectorAll('[role="slider"]')].filter(e => e.getAttribute('aria-label')?.startsWith('渐变色标') && e.getBoundingClientRect().width > 0)
     handles[1].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
@@ -102,7 +104,7 @@ try {
   })
   await check('用户切换结清旧会话、清理取色并隔离新用户历史', async () => {
     const a = window.__requirements
-    await a.input('input[aria-label="渐变整体透明度"]', 50)
+    await a.input('#demo-opacity', 50)
     const oldFinal = a.effective()
     a.q('button[aria-label="画布取色"]').click(); await a.flush()
     a.expect(!!document.querySelector('[data-eyedropper-overlay]'), 'Picking overlay missing')
@@ -112,7 +114,7 @@ try {
     a.expect(a.history().find(e => e.userId === 'demo-user').colors[0] === oldFinal, 'Old session attributed incorrectly')
     await a.ensureOpen()
     a.expect([...document.querySelectorAll('button[title]')].filter(e => e.getBoundingClientRect().width > 0).length === 1, 'New user sees old history')
-    await a.input('input[aria-label="渐变整体透明度"]', 75); await a.ensureClosed()
+    await a.input('#demo-opacity', 75); await a.ensureClosed()
     a.expect(a.history().find(e => e.userId === 'demo-other').colors.length === 1, 'New user history missing')
     await a.input('#demo-user', 'demo-user', 'change')
     return { oldFinal, users: a.history().map(e => ({ userId: e.userId, count: e.colors.length })) }
@@ -175,6 +177,9 @@ try {
       return overlay
     }
     const overlay = await start()
+    const cursor = getComputedStyle(overlay).cursor
+    a.expect(cursor.includes('eyedropper-cursor.svg') || cursor.includes('data:image/svg+xml'), 'EyeDropper cursor asset missing')
+    a.expect(/\b0\s+13,\s*crosshair/.test(cursor), 'EyeDropper cursor hotspot differs from the 14px design asset')
     const r = a.q('[data-testid="pick-canvas"]').getBoundingClientRect()
     const point = { x: r.left + 24, y: r.top + 24 }
     overlay.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: point.x, clientY: point.y })); await a.flush()
@@ -183,7 +188,14 @@ try {
     const canvas = overlay.querySelector('canvas')
     const radius = { x: Number(canvas.dataset.sampleRadiusX), y: Number(canvas.dataset.sampleRadiusY) }
     a.expect(Math.abs(radius.x / a.captureScale.x - 10) < 0.51 && Math.abs(radius.y / a.captureScale.y - 10) < 0.51, 'Magnifier does not cover 10 CSS px radius')
-    const center = [...canvas.getContext('2d').getImageData(radius.x * 14 + 7, radius.y * 14 + 7, 1, 1).data]
+    const displayRadius = { x: Number(canvas.dataset.displayRadiusX), y: Number(canvas.dataset.displayRadiusY) }
+    const lens = canvas.parentElement.getBoundingClientRect()
+    a.expect(lens.width === 200 && lens.height === 200, 'Magnifier must render at 200×200 CSS px')
+    a.expect(canvas.width === 182 && canvas.height === 182 && displayRadius.x === 6 && displayRadius.y === 6, 'Magnifier must use a stable 13×13 display grid')
+    const info = overlay.querySelector('[class*=color-info-pill]')
+    const infoStyle = getComputedStyle(info)
+    a.expect(infoStyle.fontSize === '10px' && infoStyle.bottom === '56px', 'Color text size or position differs from the design')
+    const center = [...canvas.getContext('2d').getImageData(displayRadius.x * 14 + 7, displayRadius.y * 14 + 7, 1, 1).data]
     a.expect(JSON.stringify(center) === '[11,16,32,255]', 'Lens center differs from sampled pixel')
     overlay.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: point.x, clientY: point.y })); await a.flush()
     a.expect(!document.querySelector('[data-eyedropper-overlay]') && a.source().includes('rgba(11, 16, 32, 1)'), 'Picked color not confirmed')
@@ -198,7 +210,7 @@ try {
     }
     await a.ensureClosed()
     a.expect(a.errors.length === 0, `Browser errors: ${JSON.stringify(a.errors)}`)
-    return { point, radius, center, grid: [canvas.width / 14, canvas.height / 14], errors: a.errors }
+    return { point, radius, displayRadius, lens: [lens.width, lens.height], info: { fontSize: infoStyle.fontSize, bottom: infoStyle.bottom }, center, grid: [canvas.width / 14, canvas.height / 14], errors: a.errors }
   })
   writeFileSync(reportPath, JSON.stringify({ date: new Date().toISOString(), target: url.href, results }, null, 2) + '\n')
   console.log(`Browser acceptance: ${results.length}/${results.length}; ${reportPath}`)

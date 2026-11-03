@@ -12,6 +12,7 @@ import type { EffectiveColor } from '../../src/shared/types'
 
 const gradient = 'linear-gradient(90deg, rgba(255, 0, 0, 0.8) 0%, rgba(0, 255, 0, 0.6) 35%, rgba(0, 0, 255, 0.4) 100%)'
 let wrapper: VueWrapper | undefined
+let updateOpacityModel: ((value: number) => void) | undefined
 beforeEach(() => {
   localStorage.clear(); resetRecentColors(); closeAllPickers(); eventBus.clear()
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
@@ -21,6 +22,7 @@ beforeEach(() => {
 })
 afterEach(async () => {
   wrapper?.unmount(); wrapper = undefined
+  updateOpacityModel = undefined
   await flushPromises()
   closeAllPickers(); eventBus.clear(); resetRecentColors(); vi.unstubAllGlobals(); vi.restoreAllMocks()
   document.body.innerHTML = ''
@@ -41,6 +43,7 @@ function render(value = gradient, initialOpacity = 100) {
       :get-user-id="getUserId" @pick-request="session.onPickRequest" />
       <div v-if="session.pending.value" data-picking />`,
   }), { attachTo: document.body, global: { plugins: [ElementPlus] } })
+  updateOpacityModel = value => { opacity.value = value }
   const picker = wrapper.findComponent(ColorPicker)
   return { color, opacity, user, picker, session }
 }
@@ -49,9 +52,7 @@ async function toggle() {
   await flushPromises()
 }
 async function setOpacity(value: number) {
-  const input = document.querySelector<HTMLInputElement>('input[aria-label="渐变整体透明度"]')!
-  input.value = String(value)
-  input.dispatchEvent(new Event('input', { bubbles: true }))
+  updateOpacityModel?.(value)
   await flushPromises()
 }
 function alphas(color: string) {
@@ -72,6 +73,7 @@ describe('需求 3.10：渐变整体透明度和可恢复历史', () => {
   it('100 → 0 → 100 恢复全部色标，关闭前不写历史', async () => {
     const { color, opacity, picker } = render()
     await toggle()
+    expect(document.querySelector('input[aria-label="渐变整体透明度"]')).toBeNull()
     await setOpacity(0)
     expect(opacity.value).toBe(0)
     expect(alphas(latest(picker).color)).toEqual([0, 0, 0])

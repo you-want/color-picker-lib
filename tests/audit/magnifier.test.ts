@@ -29,8 +29,12 @@ describe('需求 3.10：放大镜覆盖页面半径 10 CSS px', () => {
     expect(context.getImageData).toHaveBeenCalledWith(50 * scaleX, 30 * scaleY, 1, 1)
     expect(context.drawImage).toHaveBeenCalledWith(screenshot,
       50 * scaleX - radiusX, 30 * scaleY - radiusY, radiusX * 2 + 1, radiusY * 2 + 1,
-      0, 0, (radiusX * 2 + 1) * 14, (radiusY * 2 + 1) * 14)
-    expect(context.strokeRect).toHaveBeenCalledWith(radiusX * 14, radiusY * 14, 14, 14)
+      0, 0, 195, 195)
+    expect(context.strokeRect).toHaveBeenCalledWith(90, 90, 15, 15)
+    const lens = document.querySelector('[class*=mag-canvas]') as HTMLCanvasElement
+    expect(lens.width).toBe(195)
+    expect(lens.dataset.displayRadiusX).toBe('6')
+    expect(lens.dataset.displayRadiusY).toBe('6')
     expect(wrapper.emitted('confirm')).toEqual([['#123456']])
   })
 })

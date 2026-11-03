@@ -236,9 +236,10 @@ watch(
 watch(
   () => props.sliderButtons,
   (val) => {
-    if (!popoverShow.value) {
-      sliderButtonsValue.value = (val || []).map(item => ({ ...item }))
-    }
+    // 无论弹窗开合都保持 sliderButtonsValue 与宿主 prop 引用一致；
+    // 内部 sliderButtonsValue 通过 emit('changeColorSet', sliderButtonsValue.value) 直接把同一数组回写给宿主，
+    // 宿主 stop.isActive 等属性变更也会因对象共享直接反映到 ColorPicker，避免克隆打断这条隐式同步链。
+    sliderButtonsValue.value = val || []
   },
   { deep: true },
 )
@@ -800,19 +801,6 @@ defineExpose({ applyPickedColor, effectiveColor })
               </button>
             </el-tooltip>
           </div>
-          <label v-if="colorType === 1" :class="style['gradient-opacity']">
-            <span>整体透明度</span>
-            <input
-              v-model.number="fillOpacityValue"
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              aria-label="渐变整体透明度"
-              @keydown.stop
-            >
-            <output>{{ normalizedOpacity }}%</output>
-          </label>
           <div
             ref="sketchPickerRootRef"
             :class="style['picker-body']"
@@ -836,18 +824,16 @@ defineExpose({ applyPickedColor, effectiveColor })
                 @click.stop="startEyeDropper"
               >
                 <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 14 14"
                   fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
                   aria-hidden="true"
                 >
                   <path
-                    d="m14 8 2-2 2-3a2 2 0 0 1 3 3l-3 2-2 2M12 6l6 6M14 8 4 18l-1 3 3-1L16 10"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
+                    d="M13.998 1.782C13.998 1.309 13.81.856 13.475.522 13.141.188 12.688 0 12.216 0 11.743 0 11.29.188 10.956.522L8.33 3.149 7.718 2.538c-.359-.359-.937-.359-1.296 0l-.647.647c-.172.172-.269.405-.269.648 0 .243.097.476.269.648l.612.612L.522 10.956A3.04 3.04 0 0 0 0 12.216c0 .721.434 1.373 1.1 1.649.667.276 1.434.123 1.943-.388l5.864-5.864.612.612c.172.172.405.269.648.269.243 0 .476-.097.648-.269l.647-.647c.172-.172.269-.405.269-.648 0-.243-.097-.476-.269-.648L10.849 5.669 13.475 3.042c.334-.334.523-.787.523-1.26ZM1.194 12.805c-.328-.329-.338-.858-.023-1.2l5.864-5.865L8.258 6.963 2.393 12.83c-.342.314-.871.304-1.2-.025Z"
+                    fill="#222"
+                    fill-rule="evenodd"
                   />
                 </svg>
               </button>

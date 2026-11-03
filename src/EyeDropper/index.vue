@@ -21,11 +21,12 @@ const emit = defineEmits<{
 }>()
 
 const RADIUS = 10
-const STEP = 14
-const LENS_SIZE = 180
-const gridRadius = ref({ x: RADIUS, y: RADIUS })
-const lensWidth = computed(() => (gridRadius.value.x * 2 + 1) * STEP)
-const lensHeight = computed(() => (gridRadius.value.y * 2 + 1) * STEP)
+const DISPLAY_RADIUS = 6
+const STEP = 15
+const LENS_SIZE = 200
+const sampleRadius = ref({ x: RADIUS, y: RADIUS })
+const lensWidth = computed(() => (DISPLAY_RADIUS * 2 + 1) * STEP)
+const lensHeight = computed(() => (DISPLAY_RADIUS * 2 + 1) * STEP)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const ready = ref(false)
 const valid = ref(false)
@@ -72,8 +73,8 @@ async function startPick() {
       throw new Error('无法读取截图像素')
     }
     snapshot = { canvas, context, rect }
-    // 页面半径固定为 10 CSS px；每格仍对应一个截图像素，高清屏增加格数。
-    gridRadius.value = {
+    // 采样范围固定为页面半径 10 CSS px；截图分辨率只影响源图采样半径。
+    sampleRadius.value = {
       x: Math.max(1, Math.round(RADIUS * canvas.width / rect.width)),
       y: Math.max(1, Math.round(RADIUS * canvas.height / rect.height)),
     }
@@ -106,14 +107,14 @@ function render(x: number, y: number) {
     const context = canvasRef.value?.getContext('2d')
     if (context) {
       context.imageSmoothingEnabled = false
-      const { x: radiusX, y: radiusY } = gridRadius.value
+      const { x: radiusX, y: radiusY } = sampleRadius.value
       const width = lensWidth.value
       const height = lensHeight.value
       context.clearRect(0, 0, width, height)
       context.drawImage(snapshot.canvas, point.x - radiusX, point.y - radiusY, radiusX * 2 + 1, radiusY * 2 + 1, 0, 0, width, height)
       context.beginPath()
       context.strokeStyle = 'rgba(255, 255, 255, 0.35)'
-      context.lineWidth = 1
+      context.lineWidth = 2
       for (let i = 0; i <= width; i += STEP) {
         context.moveTo(i, 0)
         context.lineTo(i, height)
@@ -124,11 +125,11 @@ function render(x: number, y: number) {
       }
       context.stroke()
       context.strokeStyle = '#000000'
-      context.lineWidth = 3
-      context.strokeRect(radiusX * STEP, radiusY * STEP, STEP, STEP)
+      context.lineWidth = 2
+      context.strokeRect(DISPLAY_RADIUS * STEP, DISPLAY_RADIUS * STEP, STEP, STEP)
       context.strokeStyle = '#FFFFFF'
       context.lineWidth = 1
-      context.strokeRect(radiusX * STEP, radiusY * STEP, STEP, STEP)
+      context.strokeRect(DISPLAY_RADIUS * STEP, DISPLAY_RADIUS * STEP, STEP, STEP)
     }
     return true
   } catch {
@@ -224,8 +225,10 @@ onBeforeUnmount(() => {
           ref="canvasRef"
           :width="lensWidth"
           :height="lensHeight"
-          :data-sample-radius-x="gridRadius.x"
-          :data-sample-radius-y="gridRadius.y"
+          :data-sample-radius-x="sampleRadius.x"
+          :data-sample-radius-y="sampleRadius.y"
+          :data-display-radius-x="DISPLAY_RADIUS"
+          :data-display-radius-y="DISPLAY_RADIUS"
           :class="style['mag-canvas']"
         />
         <div :class="style['color-info-pill']">
