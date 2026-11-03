@@ -21,7 +21,7 @@ import {
   toSketchPickerColorValue,
 } from '../color-utils/ColorUtil'
 import SliderColorSetting from '../SliderColorSetting/index.vue'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, triggerRef, watch } from 'vue'
 import { SketchPicker } from 'vue-color'
 import style from './index.module.scss'
 import 'vue-color/style.css'
@@ -228,7 +228,7 @@ watch(
     if (popoverShow.value) {
       sessionChanged = false
       recordSessionColor(value || props.defaultColor)
-      if (colorType.value === 1) emit('changeColorSet', sliderButtonsValue.value)
+      if (colorType.value === 1) emit('changeColorSet', [...sliderButtonsValue.value])
     }
   },
   { immediate: true },
@@ -236,10 +236,14 @@ watch(
 watch(
   () => props.sliderButtons,
   (val) => {
-    // 无论弹窗开合都保持 sliderButtonsValue 与宿主 prop 引用一致；
-    // 内部 sliderButtonsValue 通过 emit('changeColorSet', sliderButtonsValue.value) 直接把同一数组回写给宿主，
-    // 宿主 stop.isActive 等属性变更也会因对象共享直接反映到 ColorPicker，避免克隆打断这条隐式同步链。
-    sliderButtonsValue.value = val || []
+    // 宿主（画布渐变控件）可能整体替换数组，也可能就地增删色标。始终把内部状态换成新数组，
+    // 保证弹窗内的色标条立即重渲染；只复制数组、不复制色标对象，保留 isActive 等属性共享。
+    const next = val || []
+    if (next === sliderButtonsValue.value) {
+      triggerRef(sliderButtonsValue)
+    } else {
+      sliderButtonsValue.value = [...next]
+    }
   },
   { deep: true },
 )
@@ -275,12 +279,12 @@ watch(
       recordSessionColor()
       syncFromModel()
       if (colorType.value === 1) {
-        emit('changeColorSet', sliderButtonsValue.value)
+        emit('changeColorSet', [...sliderButtonsValue.value])
       }
       await nextTick()
       expressColor()
       if (colorType.value === 1 && !props.gradientWithoutAnchors) {
-        eventBus.emit('changeSliderButtons', sliderButtonsValue.value)
+        eventBus.emit('changeSliderButtons', [...sliderButtonsValue.value])
       }
     } else {
       finishSession()
@@ -338,9 +342,9 @@ function updateValue(colors: Parameters<typeof sketchPickerInputToColorString>[0
     const stop = sliderButtonsValue.value.find(item => item.isActive) || sliderButtonsValue.value[0]
     if (stop) {
       stop.color = value
-      emit('changeColorSet', sliderButtonsValue.value)
+      emit('changeColorSet', [...sliderButtonsValue.value])
       applyColor(buildGradient())
-      eventBus.emit('changeSliderButtons', sliderButtonsValue.value)
+      eventBus.emit('changeSliderButtons', [...sliderButtonsValue.value])
     }
   } else {
     applyColor(value)
@@ -356,8 +360,8 @@ function chooseRecentColor(value: string, index: number) {
     fillOpacityValue.value = snapshot.fillOpacity
     applyColor(snapshot.sourceColor)
     syncFromModel(snapshot.sourceColor)
-    emit('changeColorSet', sliderButtonsValue.value)
-    nextTick(() => eventBus.emit('changeSliderButtons', sliderButtonsValue.value))
+    emit('changeColorSet', [...sliderButtonsValue.value])
+    nextTick(() => eventBus.emit('changeSliderButtons', [...sliderButtonsValue.value]))
   } else {
     if (colorType.value === 1) updateValue(value)
     else {
@@ -376,9 +380,9 @@ function colorTypeChange(value: number | string | boolean | undefined) {
       { position: 100, color: rgba(base, 0), isActive: false, id: 'stop-1', type: 'end' },
     ]
     simpleGradientActiveStop.value = 0
-    emit('changeColorSet', sliderButtonsValue.value)
+    emit('changeColorSet', [...sliderButtonsValue.value])
     applyColor(buildGradient())
-    nextTick(() => eventBus.emit('changeSliderButtons', sliderButtonsValue.value))
+    nextTick(() => eventBus.emit('changeSliderButtons', [...sliderButtonsValue.value]))
   } else {
     applyColor(selectColor.value || props.defaultColor)
   }
@@ -398,17 +402,26 @@ function setSimpleGradientStop(index: 0 | 1) {
   getSliderPointColor(sliderButtonsValue.value[index])
 }
 function updateSliderButtons(value: SliderButton | SliderButton[] | number) {
+  // 色标集合始终以新数组回写宿主：宿主画布对 sliderButtons 的监听才能感知增删，
+  // 就地 push/splice 再回传原引用会绕过宿主的数组身份变化，导致画布不刷新。
+  let next: SliderButton[]
   if (Array.isArray(value)) {
-    sliderButtonsValue.value = value
+    next = [...value]
   } else if (typeof value === 'number') {
-    sliderButtonsValue.value.splice(value, 1)
+    next = sliderButtonsValue.value.filter((_, index) => index !== value)
+    if (next.length && !next.some(stop => stop.isActive)) {
+      // 删除当前激活色标后把激活态交给剩余第一个，避免面板停留在已删除颜色。
+      next[0] = { ...next[0], isActive: true }
+      selectColor.value = next[0].color
+    }
   } else {
-    sliderButtonsValue.value.push(value)
+    next = [...sliderButtonsValue.value, value]
     selectColor.value = value.color
   }
-  emit('changeColorSet', sliderButtonsValue.value)
+  sliderButtonsValue.value = next
+  emit('changeColorSet', [...next])
   applyColor(buildGradient())
-  eventBus.emit('changeSliderButtons', sliderButtonsValue.value)
+  eventBus.emit('changeSliderButtons', [...next])
 }
 function reverseColor() {
   const stops = [...sliderButtonsValue.value].sort((a, b) => a.position - b.position)
@@ -418,8 +431,8 @@ function reverseColor() {
   })
   selectColor.value = stops.find(item => item.isActive)?.color || selectColor.value
   applyColor(buildGradient())
-  emit('changeColorSet', sliderButtonsValue.value)
-  eventBus.emit('changeSliderButtons', sliderButtonsValue.value)
+  emit('changeColorSet', [...sliderButtonsValue.value])
+  eventBus.emit('changeSliderButtons', [...sliderButtonsValue.value])
 }
 function setSliderAngleHandler(value: number) {
   if (!popoverShow.value || colorType.value !== 1 || props.gradientWithoutAnchors) {
@@ -439,7 +452,7 @@ function degValueChangeHandler() {
 }
 function lineSliderReadyHandler() {
   if (popoverShow.value && colorType.value === 1 && !props.gradientWithoutAnchors) {
-    eventBus.emit('changeSliderButtons', sliderButtonsValue.value)
+    eventBus.emit('changeSliderButtons', [...sliderButtonsValue.value])
   }
 }
 function startEyeDropper() {

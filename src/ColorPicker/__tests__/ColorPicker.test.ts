@@ -9,7 +9,7 @@ import { defineComponent, nextTick, ref, watch } from 'vue'
 import ColorPicker from '../index.vue'
 
 type PickerVm = ComponentPublicInstance<{
-  stops: { position: number, color: string, isActive: boolean }[]
+  stops: { position: number, color: string, isActive: boolean, id?: string }[]
 }>
 
 // 宿主登录态演示：模拟从 localStorage 的 auth-token 解析出 userId（真实宿主里换成你的登录态来源）
@@ -100,7 +100,7 @@ async function toggle() {
 function pickerInput(value: string) {
   wrapper.findComponent({ name: 'SketchPicker' }).vm.$emit('input', value)
 }
-function stops(): { position: number, color: string, isActive: boolean }[] {
+function stops(): { position: number, color: string, isActive: boolean, id?: string }[] {
   return (wrapper.vm as unknown as PickerVm).stops
 }
 function history() {
@@ -178,6 +178,34 @@ describe('调色板颜色会话（解耦版）', () => {
     await toggle()
     expect(stops()).toHaveLength(3)
     expect(history()).toHaveLength(1)
+  })
+  it('弹窗内增删色标以新数组即时回写宿主，宿主无需重新选中即可刷新', async () => {
+    const picker = render('linear-gradient(180deg, #ff0000 0%, #0000ff 100%)')
+    await toggle()
+    const slider = wrapper.findComponent({ name: 'SliderColorSetting' })
+    slider.vm.$emit('updateSliderButtons', {
+      position: 50,
+      type: 'middle',
+      isActive: true,
+      id: 'middle-1',
+      color: '#00ff00',
+    })
+    await flushPromises()
+    expect(stops()).toHaveLength(3)
+    expect(stops().find(stop => stop.id === 'middle-1')).toMatchObject({
+      position: 50,
+      color: '#00ff00',
+      isActive: true,
+    })
+    const emitted = picker.emitted('changeColorSet')!
+    // 增删必须回写新数组引用，宿主对 sliderButtons 的浅层监听才能感知变化。
+    expect(emitted[emitted.length - 1][0]).not.toBe(emitted[emitted.length - 2][0])
+    // 新增色标追加在数组末尾，按该位置删除中间色标。
+    slider.vm.$emit('updateSliderButtons', 2)
+    await flushPromises()
+    expect(stops()).toHaveLength(2)
+    expect(stops().some(stop => stop.id === 'middle-1')).toBe(false)
+    expect(stops().map(stop => stop.isActive)).toEqual([true, false])
   })
   it('从纯色生成同色相不透明到透明的渐变，打开时默认选择左侧色标', async () => {
     const picker = render('#316BFF80')

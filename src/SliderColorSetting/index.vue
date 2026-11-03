@@ -225,7 +225,8 @@ function handleTrackClick(event: MouseEvent) {
 
 // 开始拖拽
 function startDrag(event: MouseEvent, slider: any) {
-  if (props.disabled) {
+  // 仅左键拖拽；右键留给删除色标，不触发拖动和激活切换。
+  if (props.disabled || event.button !== 0) {
     return
   }
 

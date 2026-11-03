@@ -42,6 +42,13 @@ describe('渐变滑块键盘和外部输入隔离', () => {
     const handles = render(); await handles[0].trigger('focus'); await handles[0].trigger('keydown', { key: 'Delete' })
     expect(wrapper!.emitted('updateSliderButtons')).toBeUndefined()
   })
+  it('右键删除中间色标，端点不响应', async () => {
+    const handles = render()
+    await handles[1].trigger('contextmenu')
+    expect(wrapper!.emitted('updateSliderButtons')).toEqual([[1]])
+    await handles[0].trigger('contextmenu')
+    expect(wrapper!.emitted('updateSliderButtons')).toEqual([[1]])
+  })
   it('宿主输入框的 Backspace 不删除选中的色标', async () => {
     render()
     const input = document.createElement('input'); document.body.append(input); input.focus()
