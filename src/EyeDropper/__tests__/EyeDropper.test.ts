@@ -56,8 +56,8 @@ describe('画布取色', () => {
     expect(context.getImageData).toHaveBeenLastCalledWith(50, 20, 1, 1)
     expect(wrapper.emitted('confirm')).toEqual([['#123456']])
     expect(wrapper.emitted('close')).toHaveLength(1)
-    // 采样范围仍覆盖 10 CSS px；显示网格固定为 13×13 格。
-    expect(context.drawImage).toHaveBeenLastCalledWith(expect.any(HTMLCanvasElement), 30, 0, 41, 41, 0, 0, 195, 195)
+    // 采样范围覆盖 6 CSS px；显示网格固定为 13×13 格，每格对应 1 个 CSS 像素。
+    expect(context.drawImage).toHaveBeenLastCalledWith(expect.any(HTMLCanvasElement), 38, 8, 25, 25, 0, 0, 195, 195)
     expect(context.strokeRect).toHaveBeenCalledWith(90, 90, 15, 15)
     const lens = document.querySelector('[class*=mag-canvas]') as HTMLCanvasElement
     expect(lens.width).toBe(195)

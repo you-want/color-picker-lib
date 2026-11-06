@@ -20,7 +20,8 @@ const emit = defineEmits<{
   (e: 'nativeUnsupported'): void
 }>()
 
-const RADIUS = 10
+// 取样与显示半径一致：13×13 网格，每个网格代表 1 个 CSS 像素（对齐 V2.3 设计稿）。
+const RADIUS = 6
 const DISPLAY_RADIUS = 6
 const STEP = 15
 const LENS_SIZE = 200
@@ -93,7 +94,7 @@ async function startPick() {
       throw new Error('无法读取截图像素')
     }
     snapshot = { canvas, context }
-    // 采样范围固定为页面半径 10 CSS px；截图分辨率只影响源图采样半径。
+    // 采样范围固定为页面半径 6 CSS px（13×13 像素，与放大镜网格一一对应）；截图分辨率只影响源图采样半径。
     sampleRadius.value = {
       x: Math.max(1, Math.round(RADIUS * canvas.width / rect.width)),
       y: Math.max(1, Math.round(RADIUS * canvas.height / rect.height)),
@@ -151,11 +152,8 @@ function render(x: number, y: number, rect?: TargetRect) {
         context.lineTo(width, i)
       }
       context.stroke()
-      context.strokeStyle = '#000000'
-      context.lineWidth = 2
-      context.strokeRect(DISPLAY_RADIUS * STEP, DISPLAY_RADIUS * STEP, STEP, STEP)
       context.strokeStyle = '#FFFFFF'
-      context.lineWidth = 1
+      context.lineWidth = 2
       context.strokeRect(DISPLAY_RADIUS * STEP, DISPLAY_RADIUS * STEP, STEP, STEP)
     }
     return true

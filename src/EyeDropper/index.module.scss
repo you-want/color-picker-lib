@@ -2,7 +2,9 @@
   position: fixed;
   inset: 0;
   z-index: 9999;
-  cursor: url('./eyedropper-cursor.svg') 13 1,
+  // hotspot 必须落在吸管笔尖（14×14 图标左下角的尖端），否则取色点会偏到尾部，
+  // 放大镜取样的也是尾部区域的像素。
+  cursor: url('./eyedropper-cursor.svg') 0 14,
     crosshair;
 
   // 截图准备中：等待光标，提示用户正在加载。
@@ -56,7 +58,7 @@
 .pick-hint {
   position: fixed;
   left: 50%;
-  bottom: 24px;
+  top: 24px;
   transform: translateX(-50%);
   display: flex;
   align-items: center;

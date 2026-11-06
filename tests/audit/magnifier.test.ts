@@ -15,7 +15,7 @@ beforeEach(() => {
 })
 afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks(); vi.clearAllMocks() })
 
-describe('需求 3.10：放大镜覆盖页面半径 10 CSS px', () => {
+describe('设计稿：放大镜 13×13 网格，覆盖页面半径 6 CSS px', () => {
   it.each([[1, 1], [2, 2], [1.5, 1.5], [2, 3]])('截图比例 %s × %s 时网格逐像素显示，中心与取色点一致', async (scaleX, scaleY) => {
     const target = document.createElement('div')
     target.getBoundingClientRect = () => ({ left: 100, top: 50, width: 200, height: 100 }) as DOMRect
@@ -25,7 +25,7 @@ describe('需求 3.10：放大镜覆盖页面半径 10 CSS px', () => {
     wrapper = mount(EyeDropper, { props: { target } })
     await flushPromises()
     document.querySelector('[data-eyedropper-overlay]')!.dispatchEvent(new MouseEvent('click', { clientX: 150, clientY: 80, bubbles: true }))
-    const radiusX = 10 * scaleX; const radiusY = 10 * scaleY
+    const radiusX = 6 * scaleX; const radiusY = 6 * scaleY
     expect(context.getImageData).toHaveBeenCalledWith(50 * scaleX, 30 * scaleY, 1, 1)
     expect(context.drawImage).toHaveBeenCalledWith(screenshot,
       50 * scaleX - radiusX, 30 * scaleY - radiusY, radiusX * 2 + 1, radiusY * 2 + 1,
