@@ -24,6 +24,7 @@ const RADIUS = 10
 const DISPLAY_RADIUS = 6
 const STEP = 15
 const LENS_SIZE = 200
+type TargetRect = Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>
 const sampleRadius = ref({ x: RADIUS, y: RADIUS })
 const lensWidth = computed(() => (DISPLAY_RADIUS * 2 + 1) * STEP)
 const lensHeight = computed(() => (DISPLAY_RADIUS * 2 + 1) * STEP)
@@ -31,6 +32,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const ready = ref(false)
 const valid = ref(false)
 const error = ref(false)
+const inTarget = ref(false)
 const hint = ref('')
 const mouse = ref({ x: 0, y: 0 })
 const color = ref({ r: 0, g: 0, b: 0, hex: '#000000' })
@@ -39,7 +41,6 @@ let frame = 0
 let snapshot: {
   canvas: HTMLCanvasElement
   context: CanvasRenderingContext2D
-  rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>
 } | null = null
 
 const containerStyle = computed(() => {
@@ -59,11 +60,30 @@ const containerStyle = computed(() => {
   }
 })
 
+// 光标三态：加载中等待、画布范围内吸管（默认）、范围外或失败恢复普通箭头。
+const overlayClass = computed(() => [
+  style['magnifier-overlay'],
+  {
+    [style['is-loading']]: !ready.value && !error.value,
+    [style['is-outside']]: error.value || (ready.value && !inTarget.value),
+  },
+])
+
+const overlayRef = ref<HTMLDivElement | null>(null)
+function applyCursor() {
+  const el = overlayRef.value
+  const outside = error.value || (ready.value && !inTarget.value)
+  const loading = !ready.value && !error.value && !outside
+  // 仅改写 overlay 自身光标，不触碰宿主页面 body 光标。
+  if (el) {
+    el.style.cursor = loading ? 'progress' : outside ? 'default' : ''
+  }
+}
+
 async function startPick() {
   try {
     const target = props.target || document.documentElement
-    const bounds = target.getBoundingClientRect()
-    const rect = { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height }
+    const rect = getTargetRect()
     const canvas = await captureCanvas(target, props.capture)
     if (disposed) {
       return
@@ -72,13 +92,14 @@ async function startPick() {
     if (!context || !canvas.width || !canvas.height || !rect.width || !rect.height) {
       throw new Error('无法读取截图像素')
     }
-    snapshot = { canvas, context, rect }
+    snapshot = { canvas, context }
     // 采样范围固定为页面半径 10 CSS px；截图分辨率只影响源图采样半径。
     sampleRadius.value = {
       x: Math.max(1, Math.round(RADIUS * canvas.width / rect.width)),
       y: Math.max(1, Math.round(RADIUS * canvas.height / rect.height)),
     }
     ready.value = true
+    applyCursor()
     // 浏览器不支持原生 API 时给一次提示，仅记录到 hint，不弹窗打扰。
     if (props.native !== false && !isNativeEyeDropperSupported()) {
       hint.value = getNativeEyeDropperHint()
@@ -87,16 +108,22 @@ async function startPick() {
   } catch {
     if (!disposed) {
       error.value = true
+      applyCursor()
     }
   }
 }
 
-function render(x: number, y: number) {
+function render(x: number, y: number, rect?: TargetRect) {
   if (!ready.value || !snapshot || disposed) {
     return false
   }
-  const point = samplePoint(x, y, snapshot.rect, snapshot.canvas.width, snapshot.canvas.height)
+  const point = samplePoint(x, y, rect || getTargetRect(), snapshot.canvas.width, snapshot.canvas.height)
   valid.value = !!point
+  // 光标状态仅在采样成功时更新为 true；失败时保留 handleMouseMove 已设置的值，
+  // 避免 rAF 帧时序导致 inTarget 被错误地翻转回 true（鼠标已移出画布但仍显示吸管光标）。
+  if (point) {
+    inTarget.value = true
+  }
   if (!point) {
     return false
   }
@@ -135,13 +162,32 @@ function render(x: number, y: number) {
   } catch {
     error.value = true
     valid.value = false
+    applyCursor()
     return false
   }
+}
+function getTargetRect(): TargetRect {
+  const target = props.target || document.documentElement
+  const { left, top, width, height } = target.getBoundingClientRect()
+  return { left, top, width, height }
+}
+function isWithinTarget(x: number, y: number, rect: TargetRect) {
+  return x >= rect.left && x < rect.left + rect.width && y >= rect.top && y < rect.top + rect.height
 }
 function handleMouseMove(event: MouseEvent) {
   mouse.value = { x: event.clientX, y: event.clientY }
   cancelAnimationFrame(frame)
-  frame = requestAnimationFrame(() => render(mouse.value.x, mouse.value.y))
+  frame = requestAnimationFrame(() => {
+    const rect = getTargetRect()
+    inTarget.value = isWithinTarget(mouse.value.x, mouse.value.y, rect)
+    applyCursor()
+    render(mouse.value.x, mouse.value.y, rect)
+  })
+}
+function handleMouseLeave() {
+  // 鼠标移出 overlay 时确保恢复默认光标
+  inTarget.value = false
+  applyCursor()
 }
 function confirm(event: MouseEvent) {
   mouse.value = { x: event.clientX, y: event.clientY }
@@ -173,12 +219,16 @@ function onKeydown(event: KeyboardEvent) {
 }
 onMounted(() => {
   window.addEventListener('keydown', onKeydown, true)
+  applyCursor()
   startPick()
 })
 onBeforeUnmount(() => {
   disposed = true
   cancelAnimationFrame(frame)
   snapshot = null
+  if (overlayRef.value) {
+    overlayRef.value.style.cursor = ''
+  }
   window.removeEventListener('keydown', onKeydown, true)
 })
 </script>
@@ -186,12 +236,14 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <div
-      :class="style['magnifier-overlay']"
+      ref="overlayRef"
+      :class="overlayClass"
       data-eyedropper-overlay
       role="dialog"
       aria-modal="true"
       aria-label="画布取色，点击完成，Esc 或右键取消"
       @mousemove.stop="handleMouseMove"
+      @mouseleave="handleMouseLeave"
       @click.stop="confirm"
       @contextmenu.stop.prevent="close"
       @pointerdown.stop

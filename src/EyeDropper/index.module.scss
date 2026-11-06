@@ -4,6 +4,17 @@
   z-index: 9999;
   cursor: url('./eyedropper-cursor.svg') 13 1,
     crosshair;
+
+  // 截图准备中：等待光标，提示用户正在加载。
+  &.is-loading {
+    cursor: progress;
+  }
+
+  // 鼠标移出取色范围或取色失败：恢复普通箭头，放大镜同时隐藏。
+  // 需要覆盖 .magnifier-overlay 的 cursor，故加 &. 提升特异性。
+  &.is-outside {
+    cursor: default;
+  }
 }
 
 .magnifier-container {
