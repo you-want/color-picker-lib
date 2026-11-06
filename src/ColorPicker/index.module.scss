@@ -128,6 +128,23 @@
   :global(.el-radio__label) {
     padding-left: 8px;
     font-size: 12px;
+    // 调色板在深色模式下仍是浅色面板，单选文案/圆点必须固定为浅色主题配色，
+    // 否则会跟随 Element Plus 深色变量变成浅色，白底上直接看不见。
+    color: var(--color-picker-text, #222222);
+  }
+
+  :global(.el-radio__inner) {
+    border-color: #dcdfe6;
+    background-color: #fff;
+  }
+
+  :global(.el-radio__input.is-checked .el-radio__inner) {
+    border-color: var(--el-color-primary);
+    background-color: var(--el-color-primary);
+  }
+
+  :global(.el-radio__input.is-checked + .el-radio__label) {
+    color: var(--el-color-primary);
   }
 }
 
