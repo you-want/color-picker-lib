@@ -42,7 +42,7 @@ function colorKey(value: string): string {
   ])
 }
 
-function uniqueColors(values: unknown[]): string[] {
+export function uniqueColors(values: unknown[], limit = HISTORY_LIMIT): string[] {
   const keys = new Set<string>()
   return values.filter((value): value is string => {
     if (typeof value !== 'string' || !value.trim()) {
@@ -54,7 +54,7 @@ function uniqueColors(values: unknown[]): string[] {
     }
     keys.add(key)
     return true
-  }).slice(0, HISTORY_LIMIT)
+  }).slice(0, limit)
 }
 
 function readSnapshots(value: unknown, colors: string[]): Record<string, ColorSnapshot> {

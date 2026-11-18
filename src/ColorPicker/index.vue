@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CaptureCanvasOptions } from '../EyeDropper/captureCanvas'
 import type { ColorStop as SliderButton, ColorSnapshot, EffectiveColor } from '../shared/types'
-import { useRecentColors } from '../composables/useRecentColors'
+import { uniqueColors, useRecentColors } from '../composables/useRecentColors'
 import {
   cancelPicking,
   pickerState,
@@ -121,12 +121,9 @@ let sessionColor = ''
 let sessionSnapshot: ColorSnapshot = { sourceColor: '', fillOpacity: 100 }
 let lastEmittedColor: string | null = null
 
-// 当前色固定占第一格，历史从第二格开始；允许当前色和刚提交的历史色相同。
+// 当前色固定占第一格，历史从第二格开始；历史中与当前色相同的项不再重复展示。
 const useColors = computed(() =>
-  [
-    effectiveColor.value,
-    ...recent.userColors.value,
-  ].slice(0, 16),
+  uniqueColors([effectiveColor.value, ...recent.userColors.value], 16),
 )
 const sketchPickerValue = computed(() =>
   toSketchPickerColorValue(selectColor.value, colorType.value === 1 ? 100 : normalizedOpacity.value),

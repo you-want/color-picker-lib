@@ -108,7 +108,7 @@ function history() {
 }
 
 describe('调色板颜色会话（解耦版）', () => {
-  it('连续选择颜色只更新实时格，关闭时只提交最后一次，重新打开显示在第二格', async () => {
+  it('连续选择颜色只更新实时格，关闭时只提交最后一次，重新打开不重复展示当前色', async () => {
     const picker = render()
     await toggle()
     pickerInput('#ff0000')
@@ -120,10 +120,9 @@ describe('调色板颜色会话（解耦版）', () => {
     await toggle()
     expect(history()).toEqual(['rgba(0, 0, 255, 0.5019607843137255)'])
     await toggle()
-    const colors = wrapper.findAll('button[title]')
-    expect(
-      colors.map(button => button.attributes('title')).filter(title => title?.startsWith('rgba')),
-    ).toHaveLength(2)
+    const titles = wrapper.findAll('button[title]').map(button => button.attributes('title'))
+    // 当前色固定占第一格，历史中的同色不再重复渲染。
+    expect(titles.filter(title => title?.startsWith('rgba'))).toEqual(['rgba(0, 0, 255, 0.5019607843137255)'])
     expect(picker.props('modelValue')).toBe('rgba(0, 0, 255, 0.5019607843137255)')
   })
   it('点击外部关闭并提交最终颜色', async () => {

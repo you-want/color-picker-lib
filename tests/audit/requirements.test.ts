@@ -83,7 +83,7 @@ describe('需求 3.10：渐变整体透明度和可恢复历史', () => {
     expect(alphas(latest(picker).color)).toEqual([0.8, 0.6, 0.4])
     expect(parseGradient(latest(picker).color)!.colorStops.map(stop => stop.offset)).toEqual([0, 0.35, 1])
   })
-  it('透明度编辑仅在关闭时提交最终有效色，第一格与第二格外观一致', async () => {
+  it('透明度编辑仅在关闭时提交最终有效色，重新打开不重复展示当前色', async () => {
     const { picker } = render()
     await toggle(); await setOpacity(25); await setOpacity(50)
     const effective = latest(picker).color
@@ -94,7 +94,9 @@ describe('需求 3.10：渐变整体透明度和可恢复历史', () => {
     expect(useRecentColors().findUserIdColors('alice')).toEqual([effective])
     await toggle()
     const buttons = [...document.querySelectorAll<HTMLButtonElement>('button[title]')]
-    expect(buttons.slice(0, 2).map(button => button.title)).toEqual([effective, effective])
+    // 当前色占第一格，历史里的同色不再重复渲染。
+    expect(buttons[0]?.title).toBe(effective)
+    expect(buttons.filter(button => button.title === effective)).toHaveLength(1)
   })
   it('选择全透明历史能恢复原始色标，重新提高透明度不会丢失颜色', async () => {
     const { color, opacity, picker } = render()
